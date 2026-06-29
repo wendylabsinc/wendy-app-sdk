@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Regenerates the committed grpc-swift stubs from the agent .proto files.
-# Run after updating Sources/WendyAgentClient/Protos/. Needs protoc +
+# Run after updating Sources/WendyKit/Protos/. Needs protoc +
 # protoc-gen-swift on PATH; builds protoc-gen-grpc-swift from the resolved deps.
 set -euo pipefail
 PKG="$(cd "$(dirname "$0")" && pwd)"
