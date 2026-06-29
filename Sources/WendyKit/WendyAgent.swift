@@ -57,4 +57,24 @@ public struct WendyAgent: Sendable {
             }
         }
     }
+
+    /// Available WiFi networks (ListWiFiNetworks RPC).
+    public func wifiNetworks() async throws -> [WiFiNetwork] {
+        try await withClient { client in
+            let agent = Wendy_Agent_Services_V1_WendyAgentService.Client(wrapping: client)
+            return try await agent.listWiFiNetworks(.init()) { response in
+                try response.message.networks.map(WiFiNetwork.init)
+            }
+        }
+    }
+
+    /// Current WiFi connection status (GetWiFiStatus RPC).
+    public func wifiStatus() async throws -> WiFiStatus {
+        try await withClient { client in
+            let agent = Wendy_Agent_Services_V1_WendyAgentService.Client(wrapping: client)
+            return try await agent.getWiFiStatus(.init()) { response in
+                WiFiStatus(try response.message)
+            }
+        }
+    }
 }

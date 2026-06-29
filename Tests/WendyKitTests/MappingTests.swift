@@ -67,3 +67,38 @@ import SwiftProtobuf
     c.failureCount = 0
     #expect(AppSummary(c).state == .stopped)
 }
+
+@Test func wifiNetworkMapsFields() {
+    var n = Wendy_Agent_Services_V1_ListWiFiNetworksResponse.WiFiNetwork()
+    n.ssid = "Wendy-Lab"
+    n.signalStrength = 72
+    n.isKnown = true
+    n.isConnected = true
+    let w = WiFiNetwork(n)
+    #expect(w.id == "Wendy-Lab")
+    #expect(w.signalStrength == 72)
+    #expect(w.isKnown)
+    #expect(w.isConnected)
+}
+
+@Test func wifiNetworkAbsentSignalIsNil() {
+    var n = Wendy_Agent_Services_V1_ListWiFiNetworksResponse.WiFiNetwork()
+    n.ssid = "Hidden"
+    // signal_strength unset
+    #expect(WiFiNetwork(n).signalStrength == nil)
+}
+
+@Test func wifiStatusConnected() {
+    var r = Wendy_Agent_Services_V1_GetWiFiStatusResponse()
+    r.connected = true
+    r.ssid = "Wendy-Lab"
+    let s = WiFiStatus(r)
+    #expect(s.connected)
+    #expect(s.ssid == "Wendy-Lab")
+}
+
+@Test func wifiStatusDisconnectedHasNoSSID() {
+    var r = Wendy_Agent_Services_V1_GetWiFiStatusResponse()
+    r.connected = false
+    #expect(WiFiStatus(r).ssid == nil)
+}
