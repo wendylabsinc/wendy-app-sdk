@@ -24,8 +24,11 @@ let package = Package(
                 .product(name: "GRPCNIOTransportHTTP2", package: "grpc-swift-nio-transport"),
                 .product(name: "GRPCProtobuf", package: "grpc-swift-protobuf"),
                 .product(name: "SwiftProtobuf", package: "swift-protobuf"),
-            ]
-            // Protos/ + codegen config are added (and excluded) in Task 2.
+            ],
+            // Stubs are pre-generated into Generated/ (committed); .proto sources +
+            // codegen config are kept for regeneration but excluded from the build,
+            // so no protoc is needed at build time. Regenerate with regen-agent-stubs.sh.
+            exclude: ["Protos", "grpc-swift-proto-generator-config.json"]
         ),
         .target(
             name: "WendyUI",
