@@ -1,0 +1,7 @@
+{
+  "appId": "com.example.hellowendy",
+  "entitlements": [
+    { "type": "gpu" },
+    { "type": "admin" }
+  ]
+}
