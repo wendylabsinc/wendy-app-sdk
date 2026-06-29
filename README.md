@@ -31,6 +31,27 @@ struct MyApp: App {
 
 See `Sources/HelloWendy/` for a complete example.
 
+## Test it on a real device (WendyProbe)
+
+`WendyProbe` (`Sources/WendyProbe/`) is a headless WendyKit-only probe — no UI,
+so it runs on a real WendyOS device today (the WendyUI device backend is still
+deferred). It connects to the live wendy-agent and prints device version,
+deployed apps, and WiFi status/networks. It's the SDK's on-device smoke test.
+
+The root `wendy.json` is this probe's manifest (`admin` entitlement →
+`WENDY_AGENT_SOCKET`); it is not packaging that consumer apps need.
+
+Run it on a cloud-enrolled device:
+
+    wendy cloud run --build-type swift --product WendyProbe --device <device-name>
+
+Locally (no agent socket), it prints a clear "not set" message and exits 1:
+
+    swift run WendyProbe
+
+Building just this product (`swift build --product WendyProbe`) does not compile
+WendyUI/SwiftCrossUI, so the device build stays lean.
+
 ## Packaging conventions (you own these)
 
 Declare entitlements in your app's `wendy.json`:

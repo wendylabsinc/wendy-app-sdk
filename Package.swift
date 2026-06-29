@@ -8,6 +8,10 @@ let package = Package(
         .library(name: "WendyKit", targets: ["WendyKit"]),
         .library(name: "WendyUI", targets: ["WendyUI"]),
         .executable(name: "HelloWendy", targets: ["HelloWendy"]),
+        // Headless on-device probe: depends on WendyKit only (no UI), so it
+        // builds and runs on a real WendyOS device. Build just this product to
+        // avoid compiling WendyUI/SwiftCrossUI: `swift build --product WendyProbe`.
+        .executable(name: "WendyProbe", targets: ["WendyProbe"]),
     ],
     dependencies: [
         .package(url: "https://github.com/grpc/grpc-swift.git", from: "2.0.0"),
@@ -42,6 +46,10 @@ let package = Package(
             name: "HelloWendy",
             dependencies: ["WendyKit", "WendyUI"],
             exclude: ["wendy.json", "README.md"]
+        ),
+        .executableTarget(
+            name: "WendyProbe",
+            dependencies: ["WendyKit"]
         ),
         .testTarget(name: "WendyKitTests", dependencies: ["WendyKit"]),
         .testTarget(name: "HelloWendyTests", dependencies: ["HelloWendy"]),
