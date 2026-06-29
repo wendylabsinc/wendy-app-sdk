@@ -1,3 +1,7 @@
+// Imports SwiftCrossUI (not Combine/Foundation) for ObservableObject/@Published:
+// SwiftCrossUI v0.7.0 ships its own observation types, and its views only react to
+// those — so a view-model the UI observes must use them. This couples the sample's
+// model to the UI framework, which is acceptable for an app target (not a library).
 import SwiftCrossUI
 import WendyKit
 
