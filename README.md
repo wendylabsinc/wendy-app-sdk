@@ -33,24 +33,23 @@ See `Sources/HelloWendy/` for a complete example.
 
 ## Test it on a real device (WendyProbe)
 
-`WendyProbe` (`Sources/WendyProbe/`) is a headless WendyKit-only probe — no UI,
-so it runs on a real WendyOS device today (the WendyUI device backend is still
-deferred). It connects to the live wendy-agent and prints device version,
-deployed apps, and WiFi status/networks. It's the SDK's on-device smoke test.
+The `probe/` directory is a **standalone package** with a headless,
+WendyKit-only probe — no UI, so it cross-compiles and runs on a real WendyOS
+device today (the WendyUI device backend is still deferred). It connects to the
+live wendy-agent and prints device version, deployed apps, and WiFi
+status/networks — the SDK's on-device smoke test.
 
-The root `wendy.json` is this probe's manifest (`admin` entitlement →
-`WENDY_AGENT_SOCKET`); it is not packaging that consumer apps need.
+It's a separate package (depending only on `WendyKit`) so SwiftCrossUI is never
+in its build graph and `wendy run` builds it cleanly. From `probe/`:
 
-Run it on a cloud-enrolled device:
+    cd probe
+    wendy cloud run --build-type swift --device <device-name>
 
-    wendy cloud run --build-type swift --product WendyProbe --device <device-name>
+Locally (no agent socket) it prints a clear "not set" message and exits 1:
 
-Locally (no agent socket), it prints a clear "not set" message and exits 1:
+    cd probe && swift run WendyProbe
 
-    swift run WendyProbe
-
-Building just this product (`swift build --product WendyProbe`) does not compile
-WendyUI/SwiftCrossUI, so the device build stays lean.
+See `probe/README.md` for details.
 
 ## Packaging conventions (you own these)
 

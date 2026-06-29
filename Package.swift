@@ -8,10 +8,9 @@ let package = Package(
         .library(name: "WendyKit", targets: ["WendyKit"]),
         .library(name: "WendyUI", targets: ["WendyUI"]),
         .executable(name: "HelloWendy", targets: ["HelloWendy"]),
-        // Headless on-device probe: depends on WendyKit only (no UI), so it
-        // builds and runs on a real WendyOS device. Build just this product to
-        // avoid compiling WendyUI/SwiftCrossUI: `swift build --product WendyProbe`.
-        .executable(name: "WendyProbe", targets: ["WendyProbe"]),
+        // The headless on-device probe lives in its own package under `probe/`
+        // (depends on WendyKit only, no SwiftCrossUI) so it cross-compiles and
+        // `wendy run`s cleanly for the device. See probe/README.md.
     ],
     dependencies: [
         .package(url: "https://github.com/grpc/grpc-swift.git", from: "2.0.0"),
@@ -58,10 +57,6 @@ let package = Package(
                 .product(name: "DefaultBackend", package: "swift-cross-ui", condition: .when(platforms: [.macOS, .iOS, .tvOS, .visionOS])),
             ],
             exclude: ["wendy.json", "README.md"]
-        ),
-        .executableTarget(
-            name: "WendyProbe",
-            dependencies: ["WendyKit"]
         ),
         .testTarget(name: "WendyKitTests", dependencies: ["WendyKit"]),
         .testTarget(name: "HelloWendyTests", dependencies: ["HelloWendy"]),
