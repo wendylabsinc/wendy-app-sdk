@@ -40,7 +40,8 @@ let package = Package(
         ),
         .executableTarget(
             name: "HelloWendy",
-            dependencies: ["WendyKit", "WendyUI"]
+            dependencies: ["WendyKit", "WendyUI"],
+            exclude: ["wendy.json", "README.md"]
         ),
         .testTarget(name: "WendyKitTests", dependencies: ["WendyKit"]),
         .testTarget(name: "HelloWendyTests", dependencies: ["HelloWendy"]),
