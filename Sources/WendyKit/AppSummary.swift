@@ -6,7 +6,7 @@ public struct AppSummary: Equatable, Sendable, Identifiable {
         case failed(count: Int)
     }
 
-    public var appName: String
+    public let appName: String
     public var appVersion: String
     public var state: State
 

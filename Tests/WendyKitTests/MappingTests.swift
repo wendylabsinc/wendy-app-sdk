@@ -31,6 +31,16 @@ import SwiftProtobuf
     #expect(dv.hasGPU == false)
 }
 
+@Test func deviceVersionPresentGpuFalse() {
+    var msg = Wendy_Agent_Services_V1_GetAgentVersionResponse()
+    msg.version = "2.0.0"
+    msg.os = "wendyos"
+    // Explicitly set the presence bit but leave the value false
+    msg.hasGpu_p = false
+    let dv = DeviceVersion(msg)
+    #expect(dv.hasGPU == false)
+}
+
 @Test func appSummaryRunning() {
     var c = AppContainer()
     c.appName = "sh.wendy.shell"

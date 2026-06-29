@@ -33,7 +33,7 @@ extension DeviceVersion {
             osVersion: r.hasOsVersion ? r.osVersion : nil,
             cpuArchitecture: r.cpuArchitecture,
             deviceType: r.hasDeviceType ? r.deviceType : nil,
-            hasGPU: r.hasHasGpu_p ? r.hasGpu_p : false
+            hasGPU: r.hasHasGpu_p ? r.hasGpu_p : false // proto3 optional bool: absence means false, not "GPU unknown"
         )
     }
 }
