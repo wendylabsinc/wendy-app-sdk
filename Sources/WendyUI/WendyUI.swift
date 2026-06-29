@@ -8,5 +8,11 @@
 //     have no backend and this module is dev-only.
 //
 // Re-exporting both means a WendyOS app needs only `import WendyUI`.
+//
+// SwiftCrossUI is Apple-platform-only here (see Package.swift): on Linux it has
+// no usable backend yet, so on Linux WendyUI is an empty module and the package
+// still builds for the device (WendyKit + WendyProbe).
+#if canImport(SwiftCrossUI)
 @_exported import SwiftCrossUI
 @_exported import DefaultBackend
+#endif

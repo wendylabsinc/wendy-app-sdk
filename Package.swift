@@ -19,6 +19,7 @@ let package = Package(
         .package(url: "https://github.com/grpc/grpc-swift-nio-transport", from: "1.0.0"),
         .package(url: "https://github.com/apple/swift-protobuf", from: "1.28.0"),
         .package(url: "https://github.com/stackotter/swift-cross-ui", .upToNextMinor(from: "0.7.0")),
+        .package(url: "https://github.com/apple/swift-container-plugin", from: "1.3.0"),
     ],
     targets: [
         .target(
@@ -34,17 +35,28 @@ let package = Package(
             // so no protoc is needed at build time. Regenerate with regen-agent-stubs.sh.
             exclude: ["Protos", "grpc-swift-proto-generator-config.json"]
         ),
+        // WendyUI is Apple-platform-only for now: SwiftCrossUI's DefaultBackend
+        // has no Linux backend without a display server (the device renderer,
+        // WendyKMSBackend, is a separate plan). Gating the SwiftCrossUI deps to
+        // Apple platforms — paired with `#if canImport(SwiftCrossUI)` in the
+        // sources — keeps the package Linux-buildable so WendyKit + WendyProbe
+        // build for the device. On Linux, WendyUI is an empty module.
         .target(
             name: "WendyUI",
             dependencies: [
                 "WendyKit",
-                .product(name: "SwiftCrossUI", package: "swift-cross-ui"),
-                .product(name: "DefaultBackend", package: "swift-cross-ui"),
+                .product(name: "SwiftCrossUI", package: "swift-cross-ui", condition: .when(platforms: [.macOS, .iOS, .tvOS, .visionOS])),
+                .product(name: "DefaultBackend", package: "swift-cross-ui", condition: .when(platforms: [.macOS, .iOS, .tvOS, .visionOS])),
             ]
         ),
         .executableTarget(
             name: "HelloWendy",
-            dependencies: ["WendyKit", "WendyUI"],
+            dependencies: [
+                "WendyKit",
+                "WendyUI",
+                .product(name: "SwiftCrossUI", package: "swift-cross-ui", condition: .when(platforms: [.macOS, .iOS, .tvOS, .visionOS])),
+                .product(name: "DefaultBackend", package: "swift-cross-ui", condition: .when(platforms: [.macOS, .iOS, .tvOS, .visionOS])),
+            ],
             exclude: ["wendy.json", "README.md"]
         ),
         .executableTarget(

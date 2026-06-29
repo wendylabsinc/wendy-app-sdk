@@ -1,3 +1,7 @@
+// Apple-platform-only: this model uses SwiftCrossUI's observation types and is
+// only consumed by the (Apple-only) HelloWendy UI. Guarded so the package builds
+// on the Linux device, where SwiftCrossUI is absent.
+#if canImport(SwiftCrossUI)
 // Imports SwiftCrossUI (not Combine/Foundation) for ObservableObject/@Published:
 // SwiftCrossUI v0.7.0 ships its own observation types, and its views only react to
 // those — so a view-model the UI observes must use them. This couples the sample's
@@ -42,3 +46,4 @@ final class DeviceStatusModel: ObservableObject {
         }
     }
 }
+#endif

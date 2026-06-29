@@ -1,3 +1,8 @@
+// HelloWendy is a macOS-dev UI sample (SwiftCrossUI/AppKit). It is gated to
+// Apple platforms so the package still builds for the Linux device, where the
+// SwiftCrossUI backend doesn't exist yet. On Linux it's a stub that explains
+// where to run it.
+#if canImport(SwiftCrossUI)
 import WendyUI
 import WendyKit
 
@@ -47,3 +52,16 @@ struct SampleProvider: DeviceStatusProviding {
         [AppSummary(appName: "com.example.sample", appVersion: "0.0.1", state: .stopped)]
     }
 }
+
+#else
+
+@main
+struct HelloWendyApp {
+    static func main() {
+        print("HelloWendy is a macOS UI sample (SwiftCrossUI/AppKit). Build it on macOS:")
+        print("  swift run HelloWendy")
+        print("For a headless device test, use WendyProbe instead.")
+    }
+}
+
+#endif
