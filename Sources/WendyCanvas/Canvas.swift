@@ -17,7 +17,7 @@ public struct Canvas {
 
     @inline(__always)
     private func ptr(_ x: Int, _ y: Int) -> UnsafeMutablePointer<UInt32> {
-        (base + y * stride + x * 4).assumingMemoryBound(to: UInt32.self)
+        (base + y * stride + x * MemoryLayout<UInt32>.stride).assumingMemoryBound(to: UInt32.self)
     }
 
     public func pixel(x: Int, y: Int) -> UInt32 {
@@ -57,9 +57,9 @@ public struct Canvas {
                 let d = ptr(px, py)
                 let dv = d.pointee
                 let dr = (dv >> 16) & 0xFF, dg = (dv >> 8) & 0xFF, db = dv & 0xFF
-                let r = (cr * a + dr * ia) / 255
-                let g = (cg * a + dg * ia) / 255
-                let b = (cb * a + db * ia) / 255
+                let r = (cr * a + dr * ia + 127) / 255
+                let g = (cg * a + dg * ia + 127) / 255
+                let b = (cb * a + db * ia + 127) / 255
                 d.pointee = (r << 16) | (g << 8) | b
             }
         }

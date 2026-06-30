@@ -33,6 +33,25 @@ private func makeCanvas(_ w: Int, _ h: Int) -> (Canvas, UnsafeMutableRawPointer)
     #expect(c.pixel(x: 1, y: 0) == 0)            // zero coverage → unchanged
 }
 
+@Test func blitMidRangeAlpha() {
+    let (c, base) = makeCanvas(1, 1); defer { base.deallocate() }
+    // background is black (0), blit white with coverage 128
+    // expected: r = (255 * 128 + 0 * 127 + 127) / 255 = 32767 / 255 = 128
+    let cov = GlyphCoverage(width: 1, height: 1, bearingX: 0, bearingY: 0, advance: 1, pixels: [128])
+    c.blit(cov, x: 0, y: 0, color: Color(r: 255, g: 255, b: 255))
+    let pixel = c.pixel(x: 0, y: 0)
+    let r = (pixel >> 16) & 0xFF
+    let g = (pixel >> 8) & 0xFF
+    let b = pixel & 0xFF
+    #expect(r > 0 && r < 255)
+    #expect(g > 0 && g < 255)
+    #expect(b > 0 && b < 255)
+    #expect(r == 128)
+    #expect(g == 128)
+    #expect(b == 128)
+    #expect(pixel == 0x00808080)
+}
+
 @Test func drawTextAdvancesRightward() {
     let (c, base) = makeCanvas(200, 64); defer { base.deallocate() }
     let font = FontFace.bundled()
