@@ -1,5 +1,6 @@
 import Foundation
 import CStbTrueType
+import CWendyFont
 
 /// Loads a TTF and rasterizes/measures glyphs via stb_truetype. Owns a stable
 /// copy of the font bytes for stb's lifetime.
@@ -71,12 +72,13 @@ public final class FontFace {
 extension FontFace: @unchecked Sendable {}
 
 public extension FontFace {
-    /// The bundled DejaVu font. Traps if the resource is missing (a build-config bug).
+    /// The embedded WendySans font (compiled into the binary; no resource bundle).
     static func bundled() -> FontFace {
-        guard let url = Bundle.module.url(forResource: "WendySans", withExtension: "ttf"),
-              let data = try? Data(contentsOf: url),
-              let face = FontFace(ttf: [UInt8](data))
-        else { fatalError("WendySans.ttf missing from WendyTextKit bundle resources") }
+        let count = Int(wendy_sans_ttf_len)
+        let bytes = [UInt8](UnsafeBufferPointer(start: wendy_sans_ttf_ptr, count: count))
+        guard let face = FontFace(ttf: bytes) else {
+            fatalError("embedded WendySans.ttf failed to parse (\(count) bytes)")
+        }
         return face
     }
 }

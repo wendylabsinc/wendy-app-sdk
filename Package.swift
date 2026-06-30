@@ -62,10 +62,12 @@ let package = Package(
             exclude: ["wendy.json", "README.md"]
         ),
         .target(name: "CStbTrueType"),
+        .target(name: "CWendyFont"),
         .target(
             name: "WendyTextKit",
-            dependencies: ["CStbTrueType"],
-            resources: [.copy("Resources/WendySans.ttf"), .copy("Resources/LICENSE-font.txt")]
+            dependencies: ["CStbTrueType", "CWendyFont"],
+            // Font and license kept on disk for provenance; no longer SwiftPM resources.
+            exclude: ["Resources"]
         ),
         .target(name: "WendyCanvas", dependencies: ["WendyTextKit"]),
         .target(
