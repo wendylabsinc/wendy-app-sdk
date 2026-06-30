@@ -29,5 +29,9 @@ let package = Package(
             ]
         ),
         .executableTarget(name: "TickDemo", dependencies: [.product(name: "WendyUI", package: "wendy-app-sdk")]),
+        .executableTarget(name: "DashboardDemo", dependencies: [
+            .product(name: "WendyUI", package: "wendy-app-sdk"),
+            .product(name: "WendyKit", package: "wendy-app-sdk"),
+        ]),
     ]
 )
