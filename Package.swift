@@ -56,8 +56,6 @@ let package = Package(
             dependencies: [
                 "WendyKit",
                 "WendyUI",
-                .product(name: "SwiftCrossUI", package: "swift-cross-ui", condition: .when(platforms: [.macOS, .iOS, .tvOS, .visionOS])),
-                .product(name: "DefaultBackend", package: "swift-cross-ui", condition: .when(platforms: [.macOS, .iOS, .tvOS, .visionOS])),
             ],
             exclude: ["wendy.json", "README.md"]
         ),
