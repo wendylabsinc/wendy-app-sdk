@@ -16,18 +16,30 @@ final class DashboardModel: ObservableObject {
     @Published var os = "—"
     @Published var agent = "—"
     @Published var arch = "—"
-    @Published var gpu = "—"
-    @Published var gpuAvailable = false
     @Published var wifi = "—"
     @Published var wifiOnline = false
     @Published var apps: [AppRow] = []
     @Published var reachable = false
 
+    // Live utilisation (read from the device kernel interfaces, not WendyKit).
+    @Published var cpu: Int?
+    @Published var cpuDetail = "—"
+    @Published var mem: Int?
+    @Published var memDetail = "—"
+    @Published var gpu: Int?
+    @Published var gpuDetail = "—"
+
     /// Resolved once: `fromEnvironment()` only reads `WENDY_AGENT_SOCKET`, and each
     /// RPC opens/closes its own connection, so there is nothing to keep alive.
     private let conn = WendyAgent.fromEnvironment()
+    private let metrics = SystemMetrics()
 
     func refresh() async {
+        let s = metrics.read()
+        cpu = s.cpuPercent; cpuDetail = s.cpuDetail
+        mem = s.memPercent; memDetail = s.memDetail
+        gpu = s.gpuPercent; gpuDetail = s.gpuDetail
+
         guard let conn else {
             os = "no agent socket"
             reachable = false
@@ -37,8 +49,6 @@ final class DashboardModel: ObservableObject {
             os = "\(v.os) \(v.osVersion ?? "?")"
             agent = v.agentVersion
             arch = v.cpuArchitecture
-            gpuAvailable = v.hasGPU
-            gpu = v.hasGPU ? "available" : "none"
             reachable = true
         }
         if let s = try? await conn.wifiStatus() {
