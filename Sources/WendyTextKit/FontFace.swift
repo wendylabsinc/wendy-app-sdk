@@ -64,6 +64,10 @@ public final class FontFace {
     }
 }
 
+// Safe to send/share: after init, `info` is only read by stb (no mutation),
+// and the owned font-bytes buffer is freed only in deinit.
+extension FontFace: @unchecked Sendable {}
+
 public extension FontFace {
     /// The bundled DejaVu font. Traps if the resource is missing (a build-config bug).
     static func bundled() -> FontFace {
