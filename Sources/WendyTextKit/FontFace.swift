@@ -41,7 +41,9 @@ public final class FontFace {
         let n = Int(w) * Int(h)
         var pixels = [UInt8](repeating: 0, count: n)
         if let bmp, n > 0 {
-            pixels.withUnsafeMutableBytes { _ = memcpy($0.baseAddress, bmp, n) }
+            pixels.withUnsafeMutableBytes { buf in
+                if let dest = buf.baseAddress { _ = memcpy(dest, bmp, n) }
+            }
         }
         return GlyphCoverage(
             width: Int(w), height: Int(h),

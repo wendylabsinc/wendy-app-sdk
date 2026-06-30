@@ -1,0 +1,8 @@
+{
+    "appId": "sh.wendy.app-sdk-kms-probe",
+    "version": "0.1.0",
+    "platform": "linux",
+    "entitlements": [
+        { "type": "gpu" }
+    ]
+}

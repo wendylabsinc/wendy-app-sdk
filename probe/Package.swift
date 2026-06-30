@@ -20,5 +20,13 @@ let package = Package(
                 .product(name: "WendyKit", package: "wendy-app-sdk"),
             ]
         ),
+        .executableTarget(
+            name: "KMSDrawProbe",
+            dependencies: [
+                .product(name: "WendyKMSDRM", package: "wendy-app-sdk"),
+                .product(name: "WendyCanvas", package: "wendy-app-sdk"),
+                .product(name: "WendyTextKit", package: "wendy-app-sdk"),
+            ]
+        ),
     ]
 )
