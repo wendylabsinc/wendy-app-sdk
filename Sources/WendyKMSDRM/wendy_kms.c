@@ -56,18 +56,32 @@ int wendy_kms_open(const char *path, WendyKMSDisplay *out, char *err, int errlen
     res.fb_id_ptr        = (uint64_t)(uintptr_t)fb_ids;
     if (ioctl(fd, DRM_IOCTL_MODE_GETRESOURCES, &res)) return fail(fd, err, errlen, "GETRESOURCES");
 
+    printf("kms: %u connectors, %u crtcs\n", res.count_connectors, res.count_crtcs);
+
+    // Print full crtc_ids list.
+    printf("kms: crtc_ids = [");
+    for (uint32_t i = 0; i < res.count_crtcs; i++) {
+        printf("%s%u", i ? ", " : "", (uint32_t)crtc_ids[i]);
+    }
+    printf("]\n");
+
     // Find a connected connector with at least one mode.
     uint32_t chosen_conn = 0, chosen_enc = 0;
+    uint32_t chosen_conn_enc_ids[32]; uint32_t chosen_conn_nenc = 0;
     struct drm_mode_modeinfo chosen_mode; memset(&chosen_mode, 0, sizeof chosen_mode);
     int found = 0;
     for (uint32_t i = 0; i < res.count_connectors && !found; i++) {
         struct drm_mode_get_connector conn; memset(&conn, 0, sizeof conn);
         conn.connector_id = (uint32_t)conn_ids[i];
         if (ioctl(fd, DRM_IOCTL_MODE_GETCONNECTOR, &conn)) continue; // pass 1: counts
+
+        printf("kms: connector id=%u connection=%u modes=%u encoders=%u\n",
+               conn.connector_id, conn.connection, conn.count_modes, conn.count_encoders);
+
         if (conn.connection != DRM_MODE_CONNECTED || conn.count_modes == 0) continue;
 
         struct drm_mode_modeinfo modes[64];
-        uint64_t encs[32];
+        uint32_t encs[32];
         uint32_t nmodes = conn.count_modes > 64 ? 64 : conn.count_modes;
         uint32_t nencs  = conn.count_encoders > 32 ? 32 : conn.count_encoders;
         conn.modes_ptr = (uint64_t)(uintptr_t)modes; conn.count_modes = nmodes;
@@ -79,19 +93,79 @@ int wendy_kms_open(const char *path, WendyKMSDisplay *out, char *err, int errlen
         chosen_conn = conn.connector_id;
         chosen_enc  = conn.encoder_id;
         chosen_mode = modes[0]; // preferred/first mode
+        chosen_conn_nenc = nencs;
+        for (uint32_t j = 0; j < nencs; j++) chosen_conn_enc_ids[j] = encs[j];
         found = 1;
     }
     if (!found) { snprintf(err, errlen, "no connected connector with a mode"); close(fd); return -ENODEV; }
 
-    // CRTC: via the connector's encoder if set, else first CRTC.
+    // CRTC: select via possible_crtcs bitmask from all of the connector's encoders.
+    // Priority:
+    //   1. Active encoder's crtc_id if non-zero and in crtc_ids[].
+    //   2. First crtc_ids[i] where bit i is set in the union of possible_crtcs.
+    //   3. Last resort: crtc_ids[0].
     uint32_t crtc_id = 0;
-    if (chosen_enc) {
+    int crtc_idx = -1;
+    uint32_t possible_crtcs_union = 0;
+    uint32_t active_enc_crtc = 0;
+    uint32_t chosen_enc_for_log = chosen_enc;
+    uint32_t chosen_possible_crtcs = 0;
+
+    for (uint32_t j = 0; j < chosen_conn_nenc; j++) {
         struct drm_mode_get_encoder enc; memset(&enc, 0, sizeof enc);
-        enc.encoder_id = chosen_enc;
-        if (!ioctl(fd, DRM_IOCTL_MODE_GETENCODER, &enc)) crtc_id = enc.crtc_id;
+        enc.encoder_id = chosen_conn_enc_ids[j];
+        if (ioctl(fd, DRM_IOCTL_MODE_GETENCODER, &enc)) continue;
+        possible_crtcs_union |= enc.possible_crtcs;
+        // Track the active encoder (connector's encoder_id) crtc.
+        if (enc.encoder_id == chosen_enc && enc.crtc_id != 0) {
+            active_enc_crtc = enc.crtc_id;
+            chosen_possible_crtcs = enc.possible_crtcs;
+            chosen_enc_for_log = enc.encoder_id;
+        }
+        if (chosen_enc == 0 || chosen_enc_for_log == 0) {
+            // If no active encoder, use first encoder's data for logging.
+            if (j == 0) {
+                chosen_enc_for_log = enc.encoder_id;
+                chosen_possible_crtcs = enc.possible_crtcs;
+            }
+        }
     }
-    if (!crtc_id && res.count_crtcs > 0) crtc_id = (uint32_t)crtc_ids[0];
+    // If chosen_possible_crtcs not set yet (no active enc match), use union.
+    if (chosen_possible_crtcs == 0) chosen_possible_crtcs = possible_crtcs_union;
+
+    // Priority 1: active encoder's crtc_id if it's in crtc_ids[].
+    if (active_enc_crtc) {
+        for (uint32_t i = 0; i < res.count_crtcs; i++) {
+            if ((uint32_t)crtc_ids[i] == active_enc_crtc) {
+                crtc_id = active_enc_crtc;
+                crtc_idx = (int)i;
+                break;
+            }
+        }
+    }
+
+    // Priority 2: first crtc_ids[i] where bit i is set in possible_crtcs_union.
+    if (!crtc_id) {
+        for (uint32_t i = 0; i < res.count_crtcs; i++) {
+            if (possible_crtcs_union & (1u << i)) {
+                crtc_id = (uint32_t)crtc_ids[i];
+                crtc_idx = (int)i;
+                break;
+            }
+        }
+    }
+
+    // Priority 3: last resort.
+    if (!crtc_id && res.count_crtcs > 0) {
+        crtc_id = (uint32_t)crtc_ids[0];
+        crtc_idx = 0;
+    }
+
     if (!crtc_id) { snprintf(err, errlen, "no usable CRTC"); close(fd); return -ENODEV; }
+
+    printf("kms: chosen connector=%u mode=%ux%u encoder=%u possible_crtcs=0x%x -> crtc=%u (resource index %d)\n",
+           chosen_conn, chosen_mode.hdisplay, chosen_mode.vdisplay,
+           chosen_enc_for_log, chosen_possible_crtcs, crtc_id, crtc_idx);
 
     // Dumb buffer.
     struct drm_mode_create_dumb creq; memset(&creq, 0, sizeof creq);
