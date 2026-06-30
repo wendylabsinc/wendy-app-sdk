@@ -24,6 +24,7 @@ struct KMSDrawProbe {
         }
         let w = Int(display.width), h = Int(display.height), stride = Int(display.stride)
         print("display \(w)x\(h) stride=\(stride)")
+        wendy_kms_flush_stdout()
 
         let canvas = Canvas(base: pixels, width: w, height: h, stride: stride)
         let font = FontFace.bundled()
@@ -39,6 +40,9 @@ struct KMSDrawProbe {
                         pxSize: 28, color: .white, font: font)
         canvas.drawText("the quick brown fox jumps over the lazy dog 0123456789",
                         x: w / 8 + 40, baseline: h / 8 + 200, pxSize: 28, color: .white, font: font)
+
+        wendy_kms_present(&display)
+        wendy_kms_flush_stdout()
 
         let holdSeconds = ProcessInfo.processInfo.environment["WENDY_KMS_HOLD_SECONDS"]
             .flatMap(Int.init) ?? 20

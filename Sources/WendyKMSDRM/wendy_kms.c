@@ -232,6 +232,28 @@ void wendy_kms_close(WendyKMSDisplay *d) {
     d->fd = -1; d->pixels = NULL; d->_priv = NULL;
 }
 
+void wendy_kms_present(WendyKMSDisplay *d) {
+    if (!d || d->fd < 0 || !d->_priv) return;
+    Priv *p = (Priv *)d->_priv;
+    // 1. Flush CPU cache for the mapped framebuffer.
+    if (d->pixels) msync(d->pixels, p->size, MS_SYNC);
+    // 2. Tell the driver the whole framebuffer is dirty (preferred present path).
+    struct drm_mode_fb_dirty_cmd dirty;
+    memset(&dirty, 0, sizeof dirty);
+    dirty.fb_id = p->fb_id;     // flags=0, num_clips=0, clips_ptr=0 => whole-fb dirty
+    if (ioctl(d->fd, DRM_IOCTL_MODE_DIRTYFB, &dirty) == 0) return;
+    // 3. Fallback: re-set the CRTC to re-latch the framebuffer.
+    struct drm_mode_crtc set;
+    memset(&set, 0, sizeof set);
+    set.crtc_id = p->crtc_id; set.fb_id = p->fb_id; set.x = 0; set.y = 0;
+    uint32_t cid = p->conn_id;
+    set.set_connectors_ptr = (uint64_t)(uintptr_t)&cid; set.count_connectors = 1;
+    set.mode = p->mode; set.mode_valid = 1;
+    ioctl(d->fd, DRM_IOCTL_MODE_SETCRTC, &set);
+}
+
+void wendy_kms_flush_stdout(void) { fflush(stdout); }
+
 #else  // non-Linux: empty stubs so the package builds on macOS.
 
 #include <string.h>
@@ -244,5 +266,7 @@ int wendy_kms_open(const char *path, WendyKMSDisplay *out, char *err, int errlen
     return -ENOSYS;
 }
 void wendy_kms_close(WendyKMSDisplay *d) { (void)d; }
+void wendy_kms_present(WendyKMSDisplay *d) { (void)d; }
+void wendy_kms_flush_stdout(void) {}
 
 #endif

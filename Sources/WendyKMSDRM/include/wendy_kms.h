@@ -25,6 +25,13 @@ int wendy_kms_open(const char *path, WendyKMSDisplay *out, char *err, int errlen
 // Restores the previously-active CRTC, drops master, unmaps, and closes.
 void wendy_kms_close(WendyKMSDisplay *d);
 
+// Flush CPU-drawn pixels to the scanout (msync + DRM dirty-fb; falls back to a
+// CRTC re-set). Call after drawing into `pixels`.
+void wendy_kms_present(WendyKMSDisplay *d);
+
+// Flush C stdio stdout (Swift print is block-buffered when stdout is not a tty).
+void wendy_kms_flush_stdout(void);
+
 #ifdef __cplusplus
 }
 #endif
