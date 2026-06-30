@@ -40,8 +40,10 @@ struct KMSDrawProbe {
         canvas.drawText("the quick brown fox jumps over the lazy dog 0123456789",
                         x: w / 8 + 40, baseline: h / 8 + 200, pxSize: 28, color: .white, font: font)
 
-        print("drawn; holding for 20s (or until SIGINT)")
-        sleep(20)
+        let holdSeconds = ProcessInfo.processInfo.environment["WENDY_KMS_HOLD_SECONDS"]
+            .flatMap(Int.init) ?? 20
+        print("drawn; holding for \(holdSeconds)s, then restoring the display")
+        sleep(UInt32(max(0, holdSeconds)))
 
         wendy_kms_close(&display)
         print("closed; restored prior CRTC. Restart the shell now.")
