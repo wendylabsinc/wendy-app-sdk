@@ -7,6 +7,7 @@ let package = Package(
     products: [
         .library(name: "WendyKit", targets: ["WendyKit"]),
         .library(name: "WendyUI", targets: ["WendyUI"]),
+        .library(name: "WendyTextKit", targets: ["WendyTextKit"]),
         .executable(name: "HelloWendy", targets: ["HelloWendy"]),
         // The headless on-device probe lives in its own package under `probe/`
         // (depends on WendyKit only, no SwiftCrossUI) so it cross-compiles and
@@ -58,7 +59,14 @@ let package = Package(
             ],
             exclude: ["wendy.json", "README.md"]
         ),
+        .target(name: "CStbTrueType"),
+        .target(
+            name: "WendyTextKit",
+            dependencies: ["CStbTrueType"],
+            resources: [.copy("Resources/WendySans.ttf"), .copy("Resources/LICENSE-font.txt")]
+        ),
         .testTarget(name: "WendyKitTests", dependencies: ["WendyKit"]),
         .testTarget(name: "HelloWendyTests", dependencies: ["HelloWendy"]),
+        .testTarget(name: "WendyTextKitTests", dependencies: ["WendyTextKit"]),
     ]
 )
