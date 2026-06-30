@@ -1,0 +1,45 @@
+import Testing
+import WendyTextKit
+@testable import WendyCanvas
+
+private func makeCanvas(_ w: Int, _ h: Int) -> (Canvas, UnsafeMutableRawPointer) {
+    let stride = w * 4
+    let base = UnsafeMutableRawPointer.allocate(byteCount: stride * h, alignment: 4)
+    base.initializeMemory(as: UInt8.self, repeating: 0, count: stride * h)
+    return (Canvas(base: base, width: w, height: h, stride: stride), base)
+}
+
+@Test func fillSetsEveryPixel() {
+    let (c, base) = makeCanvas(4, 4); defer { base.deallocate() }
+    c.fill(Color(r: 0x12, g: 0x34, b: 0x56))
+    #expect(c.pixel(x: 0, y: 0) == 0x00123456)
+    #expect(c.pixel(x: 3, y: 3) == 0x00123456)
+}
+
+@Test func fillRectClipsAndSetsRegion() {
+    let (c, base) = makeCanvas(4, 4); defer { base.deallocate() }
+    c.fillRect(x: 1, y: 1, w: 100, h: 100, Color(r: 255, g: 0, b: 0)) // overdraws; must clip
+    #expect(c.pixel(x: 0, y: 0) == 0)            // outside
+    #expect(c.pixel(x: 1, y: 1) == 0x00FF0000)   // inside
+    #expect(c.pixel(x: 3, y: 3) == 0x00FF0000)
+}
+
+@Test func blitCompositesByCoverage() {
+    let (c, base) = makeCanvas(2, 1); defer { base.deallocate() }
+    // full coverage at (0,0), zero at (1,0)
+    let cov = GlyphCoverage(width: 2, height: 1, bearingX: 0, bearingY: 0, advance: 2, pixels: [255, 0])
+    c.blit(cov, x: 0, y: 0, color: Color(r: 0xAA, g: 0xBB, b: 0xCC))
+    #expect(c.pixel(x: 0, y: 0) == 0x00AABBCC)   // fully covered → color
+    #expect(c.pixel(x: 1, y: 0) == 0)            // zero coverage → unchanged
+}
+
+@Test func drawTextAdvancesRightward() {
+    let (c, base) = makeCanvas(200, 64); defer { base.deallocate() }
+    let font = FontFace.bundled()
+    c.drawText("AB", x: 4, baseline: 48, pxSize: 32, color: Color(r: 255, g: 255, b: 255), font: font)
+    // Some pixel must be lit (text drawn), and lit pixels should span rightward past the first glyph.
+    var litXs: [Int] = []
+    for y in 0..<64 { for x in 0..<200 where c.pixel(x: x, y: y) != 0 { litXs.append(x) } }
+    #expect(!litXs.isEmpty)
+    #expect((litXs.max() ?? 0) > (litXs.min() ?? 0) + 10)
+}
