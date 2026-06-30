@@ -22,6 +22,8 @@ public final class WendyKMSBackend: BaseAppBackend {
 
     public init() {}
 
+    deinit { renderTimer?.cancel() }
+
     // MARK: Run loop
 
     public func runMainLoop(_ callback: @escaping @MainActor () -> Void) {
@@ -40,7 +42,7 @@ public final class WendyKMSBackend: BaseAppBackend {
         DispatchQueue.main.async { MainActor.assumeIsolated { action() } }
     }
 
-    private func renderDirtyWindows() {
+    @MainActor private func renderDirtyWindows() {
         for window in windows where window.dirty && window.isOpen {
             guard let root = window.root, let pixels = window.display.pixels else { continue }
             let canvas = Canvas(
@@ -360,7 +362,11 @@ public final class WendyKMSBackend: BaseAppBackend {
 
     // MARK: Containers — ScrollContainers
 
-    public func createScrollContainer(for child: KMSWidget) -> KMSWidget { KMSWidget(.container) }
+    public func createScrollContainer(for child: KMSWidget) -> KMSWidget {
+        let c = KMSWidget(.container)
+        c.children.append((child, SIMD2(0, 0)))
+        return c
+    }
 
     public func updateScrollContainer(
         _ scrollView: KMSWidget,
