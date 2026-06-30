@@ -29,7 +29,7 @@ private func makeCanvas(_ w: Int, _ h: Int) -> (Canvas, UnsafeMutableRawPointer)
     mid.children = [(dot, SIMD2(5, 5))]
     root.children = [(mid, SIMD2(10, 10))]
     KMSRenderer.render(root, into: canvas, font: FontFace.bundled())
-    #expect(canvas.pixel(x: 16, y: 16) == 0x0000FF00)    // 10+5 .. +2
+    #expect(canvas.pixel(x: 16, y: 16) == 0x0000FF00)    // root(10,10)+mid(5,5)=dot at (15,15); 2x2 so (16,16) is the last lit pixel
     #expect(canvas.pixel(x: 11, y: 11) == 0)
 }
 
@@ -42,5 +42,5 @@ private func makeCanvas(_ w: Int, _ h: Int) -> (Canvas, UnsafeMutableRawPointer)
     KMSRenderer.render(root, into: canvas, font: FontFace.bundled())
     var lit = 0
     for y in 0..<80 { for x in 0..<300 where canvas.pixel(x: x, y: y) != 0 { lit += 1 } }
-    #expect(lit > 0)
+    #expect(lit > 50)
 }
