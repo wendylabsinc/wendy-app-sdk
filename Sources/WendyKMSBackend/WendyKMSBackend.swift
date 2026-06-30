@@ -2,6 +2,7 @@ import Foundation
 import Dispatch
 import SwiftCrossUI
 import WendyCanvas
+import WendyTextKit
 import WendyKMSDRM
 
 public final class WendyKMSBackend: BaseAppBackend {
@@ -190,7 +191,15 @@ public final class WendyKMSBackend: BaseAppBackend {
         proposedWidth: Int?,
         proposedHeight: Int?,
         environment: EnvironmentValues
-    ) -> SIMD2<Int> { .zero }
+    ) -> SIMD2<Int> {
+        // Use the body text style as the default resolution path.
+        // Note: environment.resolvedFont is package-level access in swift-cross-ui
+        // and not reachable from this module; resolveTextStyle(.body) gives the
+        // right size for the default font and is a reasonable approximation.
+        let px = Float(resolveTextStyle(.body).pointSize)
+        let m = FontFace.bundled().measure(text, pxSize: px)
+        return SIMD2(Int(m.width.rounded(.up)), Int(m.height.rounded(.up)))
+    }
 
     public func createTextView() -> KMSWidget { KMSWidget(.text) }
 
@@ -200,6 +209,11 @@ public final class WendyKMSBackend: BaseAppBackend {
         environment: EnvironmentValues
     ) {
         textView.text = content
+        // Use the body text style as the default resolution path (same caveat as size(of:)).
+        textView.textPxSize = Float(resolveTextStyle(.body).pointSize)
+        textView.textColor = WendyKMSBackend.toColor(
+            environment.suggestedForegroundColor.resolve(in: environment) as SwiftCrossUI.Color.Resolved
+        )
         markAllDirty()
     }
 
@@ -217,8 +231,19 @@ public final class WendyKMSBackend: BaseAppBackend {
         dataHasChanged: Bool,
         environment: EnvironmentValues
     ) {
-        guard dataHasChanged else { return }
-        imageView.rgba = rgbaData
+        _updateImageStorage(imageView, rgbaData: rgbaData, width: width, height: height,
+                            dataHasChanged: dataHasChanged)
+    }
+
+    /// Stores image data on a widget. Extracted for testability without an EnvironmentValues.
+    func _updateImageStorage(
+        _ imageView: KMSWidget,
+        rgbaData: [UInt8],
+        width: Int,
+        height: Int,
+        dataHasChanged: Bool
+    ) {
+        if dataHasChanged { imageView.rgba = rgbaData }
         imageView.imgWidth = width
         imageView.imgHeight = height
         markAllDirty()
@@ -429,7 +454,7 @@ public final class WendyKMSBackend: BaseAppBackend {
 
     // MARK: Helpers
 
-    private func markAllDirty() {
+    func markAllDirty() {
         for w in windows { w.dirty = true }
     }
 }
