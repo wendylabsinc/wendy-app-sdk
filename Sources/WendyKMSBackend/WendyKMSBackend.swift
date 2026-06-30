@@ -211,20 +211,32 @@ public final class WendyKMSBackend: BaseAppBackend {
 
     // MARK: PassiveViews — TextViews
 
-    /// Body text size in pixels, scaled up for high-DPI panels (a 4K display
-    /// makes the ~13pt body unreadably small). Per-view `.font()` is ignored
-    /// (Font.resolve(in:) is package-gated upstream), so this single factor is
-    /// the only text-size lever — and it MUST be applied identically in both
-    /// `size(of:)` (measure) and `updateTextView` (render) or layout desyncs.
-    /// Override with `WENDY_KMS_FONT_SCALE` for tuning without a rebuild.
+    /// Global text-size multiplier for high-DPI panels (a 4K display makes the
+    /// stock ~13pt body unreadably small). Override with `WENDY_KMS_FONT_SCALE`
+    /// to tune without a rebuild.
     private lazy var fontScale: Float = {
         if let s = ProcessInfo.processInfo.environment["WENDY_KMS_FONT_SCALE"],
            let v = Float(s), v > 0 { return v }
         return 3.0
     }()
 
-    private func bodyPxSize() -> Float {
-        Float(resolveTextStyle(.body).pointSize) * fontScale
+    /// `Font.resolve(in:)` is package-gated upstream, so the backend can't read a
+    /// per-view `.font()`'s size directly. But `Font` is Equatable and the style
+    /// statics are public, so we recover the text style by comparing against the
+    /// known set and feed it to the backend's own `resolveTextStyle` — restoring
+    /// real typographic hierarchy (largeTitle/title/headline/body/caption …).
+    /// Anything unrecognised (e.g. a `.system(size:)` or emphasized font) falls
+    /// back to body. MUST be used identically in `size(of:)` (measure) and
+    /// `updateTextView` (render) or layout desyncs.
+    private static let knownTextStyles: [(Font, Font.TextStyle)] = [
+        (.largeTitle, .largeTitle), (.title, .title), (.title2, .title2), (.title3, .title3),
+        (.headline, .headline), (.subheadline, .subheadline), (.body, .body),
+        (.callout, .callout), (.caption, .caption), (.caption2, .caption2), (.footnote, .footnote),
+    ]
+
+    private func pxSize(for environment: EnvironmentValues) -> Float {
+        let style = Self.knownTextStyles.first { $0.0 == environment.font }?.1 ?? .body
+        return Float(resolveTextStyle(style).pointSize) * fontScale
     }
 
     public func size(
@@ -234,7 +246,7 @@ public final class WendyKMSBackend: BaseAppBackend {
         proposedHeight: Int?,
         environment: EnvironmentValues
     ) -> SIMD2<Int> {
-        let m = FontFace.bundled().measure(text, pxSize: bodyPxSize())
+        let m = FontFace.bundled().measure(text, pxSize: pxSize(for: environment))
         return SIMD2(Int(m.width.rounded(.up)), Int(m.height.rounded(.up)))
     }
 
@@ -246,7 +258,7 @@ public final class WendyKMSBackend: BaseAppBackend {
         environment: EnvironmentValues
     ) {
         textView.text = content
-        textView.textPxSize = bodyPxSize()
+        textView.textPxSize = pxSize(for: environment)
         textView.textColor = WendyKMSBackend.toColor(
             environment.suggestedForegroundColor.resolve(in: environment)
         )
