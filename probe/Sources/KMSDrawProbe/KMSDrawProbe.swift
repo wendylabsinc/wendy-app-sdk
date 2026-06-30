@@ -29,27 +29,43 @@ struct KMSDrawProbe {
         let canvas = Canvas(base: pixels, width: w, height: h, stride: stride)
         let font = FontFace.bundled()
 
-        // Background gradient-ish fill: dark navy, with a centered panel.
-        canvas.fill(Color(r: 0x10, g: 0x14, b: 0x20))
-        canvas.fillRect(x: w / 8, y: h / 8, w: w * 3 / 4, h: h * 3 / 4, Color(r: 0x1C, g: 0x24, b: 0x38))
-
+        // Edge-to-edge full-screen test pattern.
+        let navy = Color(r: 0x10, g: 0x14, b: 0x20)
         let amber = Color(r: 0xF5, g: 0xA6, b: 0x23)
-        canvas.drawText("WendyOS — WendyKMSBackend", x: w / 8 + 40, baseline: h / 8 + 80,
-                        pxSize: 48, color: amber, font: font)
-        canvas.drawText("software KMS scanout · \(w)x\(h)", x: w / 8 + 40, baseline: h / 8 + 140,
+        let cyan = Color(r: 0x21, g: 0xD0, b: 0xC0)
+        canvas.fill(navy)                                   // whole screen
+        canvas.fillRect(x: 0, y: 0, w: w, h: 96, amber)     // full-width top bar
+        canvas.fillRect(x: 0, y: h - 96, w: w, h: 96, amber) // full-width bottom bar
+        // Corner markers prove the buffer reaches all four physical corners.
+        let m = 64
+        canvas.fillRect(x: 0, y: 0, w: m, h: m, cyan)
+        canvas.fillRect(x: w - m, y: 0, w: m, h: m, cyan)
+        canvas.fillRect(x: 0, y: h - m, w: m, h: m, cyan)
+        canvas.fillRect(x: w - m, y: h - m, w: m, h: m, cyan)
+
+        canvas.drawText("WendyOS — WendyKMSBackend", x: 40, baseline: 66, pxSize: 48, color: navy, font: font)
+        canvas.drawText("full-screen software KMS scanout · \(w)x\(h)", x: 40, baseline: h / 2,
+                        pxSize: 40, color: amber, font: font)
+        canvas.drawText("the quick brown fox jumps over the lazy dog 0123456789", x: 40, baseline: h / 2 + 56,
                         pxSize: 28, color: .white, font: font)
-        canvas.drawText("the quick brown fox jumps over the lazy dog 0123456789",
-                        x: w / 8 + 40, baseline: h / 8 + 200, pxSize: 28, color: .white, font: font)
 
         wendy_kms_present(&display)
         wendy_kms_flush_stdout()
 
+        // Default to a long hold so the image persists until the container is
+        // stopped; re-present periodically so it stays latched on the display.
         let holdSeconds = ProcessInfo.processInfo.environment["WENDY_KMS_HOLD_SECONDS"]
-            .flatMap(Int.init) ?? 20
-        print("drawn; holding for \(holdSeconds)s, then restoring the display")
-        sleep(UInt32(max(0, holdSeconds)))
+            .flatMap(Int.init) ?? 86400
+        print("drawn; holding for \(holdSeconds)s (stop the container to exit)")
+        wendy_kms_flush_stdout()
+        var elapsed = 0
+        while elapsed < holdSeconds {
+            sleep(2)
+            wendy_kms_present(&display)
+            elapsed += 2
+        }
 
         wendy_kms_close(&display)
-        print("closed; restored prior CRTC. Restart the shell now.")
+        print("closed; restored prior CRTC.")
     }
 }
