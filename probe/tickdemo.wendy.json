@@ -1,0 +1,1 @@
+{ "appId": "sh.wendy.app-sdk-tickdemo", "version": "0.1.0", "platform": "linux", "entitlements": [ { "type": "gpu" } ] }

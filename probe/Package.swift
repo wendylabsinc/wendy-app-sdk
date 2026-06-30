@@ -28,5 +28,6 @@ let package = Package(
                 .product(name: "WendyTextKit", package: "wendy-app-sdk"),
             ]
         ),
+        .executableTarget(name: "TickDemo", dependencies: [.product(name: "WendyUI", package: "wendy-app-sdk")]),
     ]
 )

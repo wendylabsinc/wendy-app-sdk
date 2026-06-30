@@ -11,6 +11,13 @@ import WendyKMSDRM
 // redeclare the typealias to avoid a "redundant conformance" compiler error.
 extension App {
     public typealias Backend = WendyKMSBackend
+
+    /// Default backend instance. Mirrors the AppKitBackend / GtkBackend pattern:
+    /// each App protocol extension provides a default `backend` so conforming
+    /// types don't have to declare one explicitly.
+    public var backend: WendyKMSBackend {
+        WendyKMSBackend()
+    }
 }
 
 public final class WendyKMSBackend: BaseAppBackend {
