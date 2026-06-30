@@ -68,7 +68,7 @@ public struct Canvas {
     /// Alpha-composites an RGBA8 image (row-major, 4 bytes/pixel) over the buffer
     /// at (x, y), clipped to bounds. Straight (non-premultiplied) alpha.
     public func blitImage(_ rgba: [UInt8], width iw: Int, height ih: Int, x: Int, y: Int) {
-        guard iw > 0, ih > 0, rgba.count >= iw * ih * 4 else { return }
+        guard iw > 0, ih > 0, rgba.count / 4 >= iw * ih else { return }
         for row in 0..<ih {
             let py = y + row
             guard py >= 0, py < height else { continue }
@@ -80,16 +80,16 @@ public struct Canvas {
                 let a = UInt32(rgba[i+3])
                 if a == 0 { continue }
                 if a == 255 {
-                    self.fillRect(x: px, y: py, w: 1, h: 1, Color(value: (sr<<16)|(sg<<8)|sb))
+                    ptr(px, py).pointee = (sr << 16) | (sg << 8) | sb
                     continue
                 }
                 let ia = 255 - a
-                let dv = pixel(x: px, y: py)
+                let dv = ptr(px, py).pointee
                 let dr = (dv >> 16) & 0xFF, dg = (dv >> 8) & 0xFF, db = dv & 0xFF
                 let r = (sr * a + dr * ia + 127) / 255
                 let g = (sg * a + dg * ia + 127) / 255
                 let b = (sb * a + db * ia + 127) / 255
-                self.fillRect(x: px, y: py, w: 1, h: 1, Color(value: (r<<16)|(g<<8)|b))
+                ptr(px, py).pointee = (r << 16) | (g << 8) | b
             }
         }
     }

@@ -80,3 +80,34 @@ private func makeCanvas(_ w: Int, _ h: Int) -> (Canvas, UnsafeMutableRawPointer)
     #expect(c.pixel(x: 0, y: 0) == 0)            // outside the blit
     #expect(c.pixel(x: 1, y: 1) == 0x00FFFFFF)   // inside
 }
+
+@Test func blitImageNegativeOffsetClips() {
+    // 3x3 opaque image blit at (-1,-1): only its bottom-right 2x2 portion is visible.
+    // canvas(0,0) receives image pixel (1,1); no out-of-bounds access should occur.
+    let (c, base) = makeCanvas(2, 2); defer { base.deallocate() }
+    // Build a 3x3 image where pixel(col,row) = unique XRGB color 0x00RRGGBB
+    // row 0: red shades, row 1: green shades, row 2: blue shades
+    var rgba = [UInt8](repeating: 0, count: 3 * 3 * 4)
+    for row in 0..<3 {
+        for col in 0..<3 {
+            let i = (row * 3 + col) * 4
+            rgba[i]   = UInt8(row * 80 + 10)   // R
+            rgba[i+1] = UInt8(col * 80 + 20)   // G
+            rgba[i+2] = 30                      // B
+            rgba[i+3] = 255                     // fully opaque
+        }
+    }
+    c.blitImage(rgba, width: 3, height: 3, x: -1, y: -1)
+    // image row=1,col=1 maps to canvas (0,0)
+    let expected00 = (UInt32(rgba[( 1*3+1)*4]) << 16)
+                   | (UInt32(rgba[(1*3+1)*4+1]) << 8)
+                   |  UInt32(rgba[(1*3+1)*4+2])
+    // image row=1,col=2 maps to canvas (1,0)
+    let expected10 = (UInt32(rgba[( 1*3+2)*4]) << 16)
+                   | (UInt32(rgba[(1*3+2)*4+1]) << 8)
+                   |  UInt32(rgba[(1*3+2)*4+2])
+    #expect(c.pixel(x: 0, y: 0) == expected00)
+    #expect(c.pixel(x: 1, y: 0) == expected10)
+    #expect(c.pixel(x: 0, y: 1) != 0)   // row=2,col=1 also visible
+    #expect(c.pixel(x: 1, y: 1) != 0)   // row=2,col=2 also visible
+}
