@@ -86,6 +86,15 @@ let package = Package(
             dependencies: [
                 "WendyCanvas", "WendyTextKit", "WendyKMSDRM",
                 .product(name: "SwiftCrossUI", package: "swift-cross-ui"),
+            ],
+            swiftSettings: [
+                // SwiftCrossUI is compiled with swift-tools-version 5.10; its
+                // BackendFeatures.Core protocol uses @MainActor closures whose
+                // sendability is interpreted differently by Swift 6 strict
+                // concurrency. Building this target in Swift 5 mode avoids the
+                // cross-module sendability mismatch while keeping the rest of the
+                // package in Swift 6 mode.
+                .swiftLanguageMode(.v5),
             ]
         ),
         .testTarget(name: "WendyKMSBackendTests", dependencies: ["WendyKMSBackend"]),
