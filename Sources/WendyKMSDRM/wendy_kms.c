@@ -14,6 +14,10 @@
 #include <drm/drm.h>
 #include <drm/drm_mode.h>
 
+#ifndef DRM_MODE_CONNECTED
+#define DRM_MODE_CONNECTED 1
+#endif
+
 typedef struct {
     uint32_t conn_id, crtc_id, fb_id, handle;
     uint64_t size;
@@ -30,6 +34,7 @@ static int fail(int fd, char *err, int errlen, const char *what) {
 
 int wendy_kms_open(const char *path, WendyKMSDisplay *out, char *err, int errlen) {
     memset(out, 0, sizeof(*out));
+    out->fd = -1;
     int fd = open(path, O_RDWR | O_CLOEXEC);
     if (fd < 0) return fail(-1, err, errlen, "open");
 
@@ -59,7 +64,7 @@ int wendy_kms_open(const char *path, WendyKMSDisplay *out, char *err, int errlen
         struct drm_mode_get_connector conn; memset(&conn, 0, sizeof conn);
         conn.connector_id = (uint32_t)conn_ids[i];
         if (ioctl(fd, DRM_IOCTL_MODE_GETCONNECTOR, &conn)) continue; // pass 1: counts
-        if (conn.connection != 1 /* DRM_MODE_CONNECTED */ || conn.count_modes == 0) continue;
+        if (conn.connection != DRM_MODE_CONNECTED || conn.count_modes == 0) continue;
 
         struct drm_mode_modeinfo modes[64];
         uint64_t encs[32];
@@ -116,9 +121,10 @@ int wendy_kms_open(const char *path, WendyKMSDisplay *out, char *err, int errlen
     uint32_t cid = chosen_conn;
     set.set_connectors_ptr = (uint64_t)(uintptr_t)&cid; set.count_connectors = 1;
     set.mode = chosen_mode; set.mode_valid = 1;
-    if (ioctl(fd, DRM_IOCTL_MODE_SETCRTC, &set)) return fail(fd, err, errlen, "SETCRTC");
+    if (ioctl(fd, DRM_IOCTL_MODE_SETCRTC, &set)) { munmap(map, creq.size); return fail(fd, err, errlen, "SETCRTC"); }
 
     Priv *p = (Priv *)calloc(1, sizeof(Priv));
+    if (!p) { munmap(map, creq.size); return fail(fd, err, errlen, "calloc"); }
     p->conn_id = chosen_conn; p->crtc_id = crtc_id; p->fb_id = fb.fb_id;
     p->handle = creq.handle; p->size = creq.size; p->mode = chosen_mode; p->saved = saved;
 
@@ -156,10 +162,12 @@ void wendy_kms_close(WendyKMSDisplay *d) {
 
 #include <string.h>
 #include <stdio.h>
+#include <errno.h>
 int wendy_kms_open(const char *path, WendyKMSDisplay *out, char *err, int errlen) {
-    (void)path; if (out) memset(out, 0, sizeof(*out));
+    (void)path;
+    if (out) { memset(out, 0, sizeof(*out)); out->fd = -1; }
     snprintf(err, errlen, "WendyKMSDRM is Linux-only");
-    return -1;
+    return -ENOSYS;
 }
 void wendy_kms_close(WendyKMSDisplay *d) { (void)d; }
 
