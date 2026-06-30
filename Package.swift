@@ -38,18 +38,17 @@ let package = Package(
             // so no protoc is needed at build time. Regenerate with regen-agent-stubs.sh.
             exclude: ["Protos", "grpc-swift-proto-generator-config.json"]
         ),
-        // WendyUI is Apple-platform-only for now: SwiftCrossUI's DefaultBackend
-        // has no Linux backend without a display server (the device renderer,
-        // WendyKMSBackend, is a separate plan). Gating the SwiftCrossUI deps to
-        // Apple platforms — paired with `#if canImport(SwiftCrossUI)` in the
-        // sources — keeps the package Linux-buildable so WendyKit + WendyProbe
-        // build for the device. On Linux, WendyUI is an empty module.
+        // WendyUI is the app UI entry point. Backend selection is per platform:
+        //   - macOS/iOS/tvOS/visionOS: AppKit (via SwiftCrossUI's DefaultBackend)
+        //   - Linux (device): WendyKMSBackend — our from-scratch DRM/KMS backend
+        // SwiftCrossUI itself is pulled on all platforms; DefaultBackend is Apple-only.
         .target(
             name: "WendyUI",
             dependencies: [
                 "WendyKit",
-                .product(name: "SwiftCrossUI", package: "swift-cross-ui", condition: .when(platforms: [.macOS, .iOS, .tvOS, .visionOS])),
+                .product(name: "SwiftCrossUI", package: "swift-cross-ui"),
                 .product(name: "DefaultBackend", package: "swift-cross-ui", condition: .when(platforms: [.macOS, .iOS, .tvOS, .visionOS])),
+                .target(name: "WendyKMSBackend", condition: .when(platforms: [.linux])),
             ]
         ),
         .executableTarget(

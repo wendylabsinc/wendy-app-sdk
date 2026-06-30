@@ -5,6 +5,14 @@ import WendyCanvas
 import WendyTextKit
 import WendyKMSDRM
 
+// LVGLBackend pattern: declare the typealias in the backend itself so that any
+// module that imports WendyKMSBackend (directly or via WendyUI) automatically
+// wires `App.Backend`. WendyUI re-exports this module on Linux; it does NOT
+// redeclare the typealias to avoid a "redundant conformance" compiler error.
+extension App {
+    public typealias Backend = WendyKMSBackend
+}
+
 public final class WendyKMSBackend: BaseAppBackend {
     public typealias Widget = KMSWidget
     public typealias Window = KMSWindow
