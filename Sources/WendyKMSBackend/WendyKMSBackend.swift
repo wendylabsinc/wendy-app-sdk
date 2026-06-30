@@ -78,7 +78,13 @@ public final class WendyKMSBackend: BaseAppBackend {
     // MARK: Environment
 
     public func computeRootEnvironment(defaultEnvironment: EnvironmentValues) -> EnvironmentValues {
-        defaultEnvironment
+        // renderDirtyWindows clears each frame to opaque black, so report a dark
+        // color scheme. Otherwise SwiftCrossUI's default (.light) resolves
+        // suggestedForegroundColor to .black — black text on a black framebuffer,
+        // i.e. an invisible (apparently blank) screen.
+        var env = defaultEnvironment
+        env.colorScheme = .dark
+        return env
     }
 
     public func setRootEnvironmentChangeHandler(to action: @escaping @Sendable @MainActor () -> Void) {}
@@ -95,7 +101,12 @@ public final class WendyKMSBackend: BaseAppBackend {
             let msg = errBuf.withUnsafeBytes {
                 String(bytes: $0.prefix(while: { $0 != 0 }), encoding: .utf8) ?? ""
             }
-            print("WendyKMSBackend: wendy_kms_open failed: \(msg)")
+            // Write to stderr (unbuffered) rather than print()'s block-buffered stdout:
+            // when the device can't be opened (e.g. missing the `gpu` entitlement, or
+            // another process holds DRM master) the process often exits before a buffered
+            // stdout flush, hiding the one message that explains a blank screen.
+            FileHandle.standardError.write(Data(
+                "WendyKMSBackend: wendy_kms_open(\(path)) failed: \(msg)\n".utf8))
         }
         windows.append(window)
         return window
