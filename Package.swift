@@ -9,6 +9,7 @@ let package = Package(
         .library(name: "WendyUI", targets: ["WendyUI"]),
         .library(name: "WendyTextKit", targets: ["WendyTextKit"]),
         .library(name: "WendyCanvas", targets: ["WendyCanvas"]),
+        .library(name: "WendyKMSDRM", targets: ["WendyKMSDRM"]),
         .executable(name: "HelloWendy", targets: ["HelloWendy"]),
         // The headless on-device probe lives in its own package under `probe/`
         // (depends on WendyKit only, no SwiftCrossUI) so it cross-compiles and
@@ -67,6 +68,7 @@ let package = Package(
             resources: [.copy("Resources/WendySans.ttf"), .copy("Resources/LICENSE-font.txt")]
         ),
         .target(name: "WendyCanvas", dependencies: ["WendyTextKit"]),
+        .target(name: "WendyKMSDRM"),
         .testTarget(name: "WendyKitTests", dependencies: ["WendyKit"]),
         .testTarget(name: "HelloWendyTests", dependencies: ["HelloWendy"]),
         .testTarget(name: "WendyTextKitTests", dependencies: ["WendyTextKit"]),
