@@ -68,7 +68,16 @@ let package = Package(
             resources: [.copy("Resources/WendySans.ttf"), .copy("Resources/LICENSE-font.txt")]
         ),
         .target(name: "WendyCanvas", dependencies: ["WendyTextKit"]),
-        .target(name: "WendyKMSDRM"),
+        .target(
+            name: "WendyKMSDRM",
+            cSettings: [
+                .headerSearchPath("vendor"),
+                // The sysroot's uapi drm.h uses `__user` (a kernel annotation)
+                // that is not defined in Debian bookworm's userspace headers.
+                // Define it as empty so the vendored UAPI headers compile cleanly.
+                .define("__user", to: ""),
+            ]
+        ),
         .testTarget(name: "WendyKitTests", dependencies: ["WendyKit"]),
         .testTarget(name: "HelloWendyTests", dependencies: ["HelloWendy"]),
         .testTarget(name: "WendyTextKitTests", dependencies: ["WendyTextKit"]),
