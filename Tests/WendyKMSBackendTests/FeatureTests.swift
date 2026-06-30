@@ -22,7 +22,7 @@ import WendyCanvas
 @Test func imageViewStoresPixels() {
     let b = WendyKMSBackend()
     let v = b.createImageView()
-    // _updateImageStorage is the extracted core of updateImageView; @testable import exposes it.
+    // Exercises the internal _updateImageStorage helper (not the environment path of updateImageView), because EnvironmentValues is not constructible out-of-module — a known coverage gap.
     b._updateImageStorage(v, rgbaData: [1, 2, 3, 4], width: 1, height: 1, dataHasChanged: true)
     #expect(v.kind == .image)
     #expect(v.imgWidth == 1 && v.imgHeight == 1 && v.rgba.count == 4)

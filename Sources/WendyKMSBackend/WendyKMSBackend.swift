@@ -192,10 +192,7 @@ public final class WendyKMSBackend: BaseAppBackend {
         proposedHeight: Int?,
         environment: EnvironmentValues
     ) -> SIMD2<Int> {
-        // Use the body text style as the default resolution path.
-        // Note: environment.resolvedFont is package-level access in swift-cross-ui
-        // and not reachable from this module; resolveTextStyle(.body) gives the
-        // right size for the default font and is a reasonable approximation.
+        // NOTE: per-view .font() modifiers are ignored — Font.resolve(in:) is package-gated in swift-cross-ui, so all text renders at body size (~13pt). Revisit if upstream exposes font resolution.
         let px = Float(resolveTextStyle(.body).pointSize)
         let m = FontFace.bundled().measure(text, pxSize: px)
         return SIMD2(Int(m.width.rounded(.up)), Int(m.height.rounded(.up)))
@@ -209,10 +206,10 @@ public final class WendyKMSBackend: BaseAppBackend {
         environment: EnvironmentValues
     ) {
         textView.text = content
-        // Use the body text style as the default resolution path (same caveat as size(of:)).
+        // NOTE: per-view .font() modifiers are ignored — Font.resolve(in:) is package-gated in swift-cross-ui, so all text renders at body size (~13pt). Revisit if upstream exposes font resolution.
         textView.textPxSize = Float(resolveTextStyle(.body).pointSize)
         textView.textColor = WendyKMSBackend.toColor(
-            environment.suggestedForegroundColor.resolve(in: environment) as SwiftCrossUI.Color.Resolved
+            environment.suggestedForegroundColor.resolve(in: environment)
         )
         markAllDirty()
     }
@@ -454,7 +451,8 @@ public final class WendyKMSBackend: BaseAppBackend {
 
     // MARK: Helpers
 
-    func markAllDirty() {
+    /// Mark all windows as needing redraw. Internal (not private) so the +Features.swift extension can call it.
+    internal func markAllDirty() {
         for w in windows { w.dirty = true }
     }
 }
