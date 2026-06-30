@@ -65,6 +65,35 @@ public struct Canvas {
         }
     }
 
+    /// Alpha-composites an RGBA8 image (row-major, 4 bytes/pixel) over the buffer
+    /// at (x, y), clipped to bounds. Straight (non-premultiplied) alpha.
+    public func blitImage(_ rgba: [UInt8], width iw: Int, height ih: Int, x: Int, y: Int) {
+        guard iw > 0, ih > 0, rgba.count >= iw * ih * 4 else { return }
+        for row in 0..<ih {
+            let py = y + row
+            guard py >= 0, py < height else { continue }
+            for col in 0..<iw {
+                let px = x + col
+                guard px >= 0, px < width else { continue }
+                let i = (row * iw + col) * 4
+                let sr = UInt32(rgba[i]), sg = UInt32(rgba[i+1]), sb = UInt32(rgba[i+2])
+                let a = UInt32(rgba[i+3])
+                if a == 0 { continue }
+                if a == 255 {
+                    self.fillRect(x: px, y: py, w: 1, h: 1, Color(value: (sr<<16)|(sg<<8)|sb))
+                    continue
+                }
+                let ia = 255 - a
+                let dv = pixel(x: px, y: py)
+                let dr = (dv >> 16) & 0xFF, dg = (dv >> 8) & 0xFF, db = dv & 0xFF
+                let r = (sr * a + dr * ia + 127) / 255
+                let g = (sg * a + dg * ia + 127) / 255
+                let b = (sb * a + db * ia + 127) / 255
+                self.fillRect(x: px, y: py, w: 1, h: 1, Color(value: (r<<16)|(g<<8)|b))
+            }
+        }
+    }
+
     /// Draws a single line of text with its baseline at `baseline`, pen starting at `x`.
     public func drawText(_ s: String, x: Int, baseline: Int, pxSize: Float, color: Color, font: FontFace) {
         var penX = Float(x)

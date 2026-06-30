@@ -62,3 +62,21 @@ private func makeCanvas(_ w: Int, _ h: Int) -> (Canvas, UnsafeMutableRawPointer)
     #expect(!litXs.isEmpty)
     #expect((litXs.max() ?? 0) > (litXs.min() ?? 0) + 10)
 }
+
+@Test func blitImageCompositesRGBA() {
+    let (c, base) = makeCanvas(3, 1); defer { base.deallocate() }
+    // pixel0 opaque red, pixel1 opaque green, pixel2 transparent (alpha 0)
+    let rgba: [UInt8] = [255,0,0,255,  0,255,0,255,  0,0,255,0]
+    c.blitImage(rgba, width: 3, height: 1, x: 0, y: 0)
+    #expect(c.pixel(x: 0, y: 0) == 0x00FF0000)
+    #expect(c.pixel(x: 1, y: 0) == 0x0000FF00)
+    #expect(c.pixel(x: 2, y: 0) == 0)            // alpha 0 -> destination unchanged
+}
+
+@Test func blitImageClips() {
+    let (c, base) = makeCanvas(2, 2); defer { base.deallocate() }
+    let rgba = [UInt8](repeating: 255, count: 4 * 4 * 4) // 4x4 opaque white
+    c.blitImage(rgba, width: 4, height: 4, x: 1, y: 1)   // overhangs
+    #expect(c.pixel(x: 0, y: 0) == 0)            // outside the blit
+    #expect(c.pixel(x: 1, y: 1) == 0x00FFFFFF)   // inside
+}
