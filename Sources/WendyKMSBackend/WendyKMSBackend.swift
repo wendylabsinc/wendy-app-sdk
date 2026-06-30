@@ -211,6 +211,22 @@ public final class WendyKMSBackend: BaseAppBackend {
 
     // MARK: PassiveViews — TextViews
 
+    /// Body text size in pixels, scaled up for high-DPI panels (a 4K display
+    /// makes the ~13pt body unreadably small). Per-view `.font()` is ignored
+    /// (Font.resolve(in:) is package-gated upstream), so this single factor is
+    /// the only text-size lever — and it MUST be applied identically in both
+    /// `size(of:)` (measure) and `updateTextView` (render) or layout desyncs.
+    /// Override with `WENDY_KMS_FONT_SCALE` for tuning without a rebuild.
+    private lazy var fontScale: Float = {
+        if let s = ProcessInfo.processInfo.environment["WENDY_KMS_FONT_SCALE"],
+           let v = Float(s), v > 0 { return v }
+        return 3.0
+    }()
+
+    private func bodyPxSize() -> Float {
+        Float(resolveTextStyle(.body).pointSize) * fontScale
+    }
+
     public func size(
         of text: String,
         whenDisplayedIn widget: KMSWidget,
@@ -218,9 +234,7 @@ public final class WendyKMSBackend: BaseAppBackend {
         proposedHeight: Int?,
         environment: EnvironmentValues
     ) -> SIMD2<Int> {
-        // NOTE: per-view .font() modifiers are ignored — Font.resolve(in:) is package-gated in swift-cross-ui, so all text renders at body size (~13pt). Revisit if upstream exposes font resolution.
-        let px = Float(resolveTextStyle(.body).pointSize)
-        let m = FontFace.bundled().measure(text, pxSize: px)
+        let m = FontFace.bundled().measure(text, pxSize: bodyPxSize())
         return SIMD2(Int(m.width.rounded(.up)), Int(m.height.rounded(.up)))
     }
 
@@ -232,8 +246,7 @@ public final class WendyKMSBackend: BaseAppBackend {
         environment: EnvironmentValues
     ) {
         textView.text = content
-        // NOTE: per-view .font() modifiers are ignored — Font.resolve(in:) is package-gated in swift-cross-ui, so all text renders at body size (~13pt). Revisit if upstream exposes font resolution.
-        textView.textPxSize = Float(resolveTextStyle(.body).pointSize)
+        textView.textPxSize = bodyPxSize()
         textView.textColor = WendyKMSBackend.toColor(
             environment.suggestedForegroundColor.resolve(in: environment)
         )
