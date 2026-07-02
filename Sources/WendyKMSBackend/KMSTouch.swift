@@ -121,6 +121,10 @@ extension WendyKMSBackend {
             guard let self, let window else { return }
             MainActor.assumeIsolated { self.drainTouchEvents(window: window) }
         }
+        source.setCancelHandler { [weak self] in
+            guard let self else { return }
+            MainActor.assumeIsolated { wendy_input_close(&self.inputDevice) }
+        }
         source.resume()
         inputSource = source
     }
@@ -135,7 +139,11 @@ extension WendyKMSBackend {
                     "WendyKMSBackend: touch device lost; continuing display-only\n".utf8))
                 inputSource?.cancel()
                 inputSource = nil
-                wendy_input_close(&inputDevice)
+                if let w = pressedWidget {
+                    w.pressed = false
+                    markAllDirty()
+                    pressedWidget = nil
+                }
                 return
             }
             if n == 0 { return }
