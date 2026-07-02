@@ -17,6 +17,12 @@
 #ifndef DRM_MODE_CONNECTED
 #define DRM_MODE_CONNECTED 1
 #endif
+#ifndef DRM_MODE_DISCONNECTED
+#define DRM_MODE_DISCONNECTED 2
+#endif
+#ifndef DRM_MODE_UNKNOWNCONNECTION
+#define DRM_MODE_UNKNOWNCONNECTION 3
+#endif
 
 typedef struct {
     uint32_t conn_id, crtc_id, fb_id, handle;
@@ -56,29 +62,37 @@ int wendy_kms_open(const char *path, WendyKMSDisplay *out, char *err, int errlen
     res.fb_id_ptr        = (uint64_t)(uintptr_t)fb_ids;
     if (ioctl(fd, DRM_IOCTL_MODE_GETRESOURCES, &res)) return fail(fd, err, errlen, "GETRESOURCES");
 
-    printf("kms: %u connectors, %u crtcs\n", res.count_connectors, res.count_crtcs);
-
-    // Print full crtc_ids list.
-    printf("kms: crtc_ids = [");
+    // Diagnostics go to stderr (unbuffered): a display app that fails to open
+    // KMS keeps running (display-only), so buffered stdout is never flushed and
+    // these lines would be lost exactly when they are needed.
+    fprintf(stderr, "kms: %u connectors, %u crtcs\n", res.count_connectors, res.count_crtcs);
+    fprintf(stderr, "kms: crtc_ids = [");
     for (uint32_t i = 0; i < res.count_crtcs; i++) {
-        printf("%s%u", i ? ", " : "", (uint32_t)crtc_ids[i]);
+        fprintf(stderr, "%s%u", i ? ", " : "", (uint32_t)crtc_ids[i]);
     }
-    printf("]\n");
+    fprintf(stderr, "]\n");
 
-    // Find a connected connector with at least one mode.
+    // Pick a usable connector + mode. Prefer a CONNECTED connector; fall back to
+    // one reporting UNKNOWN connection, which DSI/eDP panels (e.g. the Raspberry
+    // Pi touch display) commonly do even while actively driving the panel. A
+    // DISCONNECTED connector or one with no modes is never used.
     uint32_t chosen_conn = 0, chosen_enc = 0;
     uint32_t chosen_conn_enc_ids[32]; uint32_t chosen_conn_nenc = 0;
     struct drm_mode_modeinfo chosen_mode; memset(&chosen_mode, 0, sizeof chosen_mode);
-    int found = 0;
-    for (uint32_t i = 0; i < res.count_connectors && !found; i++) {
+    int found = 0, chosen_is_connected = 0;
+    for (uint32_t i = 0; i < res.count_connectors; i++) {
         struct drm_mode_get_connector conn; memset(&conn, 0, sizeof conn);
         conn.connector_id = (uint32_t)conn_ids[i];
         if (ioctl(fd, DRM_IOCTL_MODE_GETCONNECTOR, &conn)) continue; // pass 1: counts
 
-        printf("kms: connector id=%u connection=%u modes=%u encoders=%u\n",
-               conn.connector_id, conn.connection, conn.count_modes, conn.count_encoders);
+        fprintf(stderr, "kms: connector id=%u connection=%u modes=%u encoders=%u\n",
+                conn.connector_id, conn.connection, conn.count_modes, conn.count_encoders);
 
-        if (conn.connection != DRM_MODE_CONNECTED || conn.count_modes == 0) continue;
+        if (conn.count_modes == 0 || conn.connection == DRM_MODE_DISCONNECTED) continue;
+        int is_connected = (conn.connection == DRM_MODE_CONNECTED);
+        // Keep the best we have: once a CONNECTED connector is chosen, don't
+        // replace it; and never downgrade a CONNECTED pick with an UNKNOWN one.
+        if (found && (chosen_is_connected || !is_connected)) continue;
 
         struct drm_mode_modeinfo modes[64];
         uint32_t encs[32];
@@ -96,8 +110,10 @@ int wendy_kms_open(const char *path, WendyKMSDisplay *out, char *err, int errlen
         chosen_conn_nenc = nencs;
         for (uint32_t j = 0; j < nencs; j++) chosen_conn_enc_ids[j] = encs[j];
         found = 1;
+        chosen_is_connected = is_connected;
+        if (is_connected) break; // best possible; stop scanning
     }
-    if (!found) { snprintf(err, errlen, "no connected connector with a mode"); close(fd); return -ENODEV; }
+    if (!found) { snprintf(err, errlen, "no connector (connected or unknown) with a mode"); close(fd); return -ENODEV; }
 
     // CRTC: select via possible_crtcs bitmask from all of the connector's encoders.
     // Priority:
