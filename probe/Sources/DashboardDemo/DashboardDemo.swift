@@ -51,7 +51,7 @@ struct DashboardDemo: App {
             .padding(64)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             .task {
-                while true {
+                while !Task.isCancelled {
                     await model.refresh()
                     try? await Task.sleep(for: .seconds(2))
                 }

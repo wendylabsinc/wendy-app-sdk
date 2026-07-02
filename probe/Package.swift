@@ -33,5 +33,9 @@ let package = Package(
             .product(name: "WendyUI", package: "wendy-app-sdk"),
             .product(name: "WendyKit", package: "wendy-app-sdk"),
         ]),
+        .executableTarget(name: "AppControlDemo", dependencies: [
+            .product(name: "WendyUI", package: "wendy-app-sdk"),
+            .product(name: "WendyKit", package: "wendy-app-sdk"),
+        ]),
     ]
 )

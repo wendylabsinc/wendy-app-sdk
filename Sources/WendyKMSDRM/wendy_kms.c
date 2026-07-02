@@ -17,12 +17,20 @@
 #ifndef DRM_MODE_CONNECTED
 #define DRM_MODE_CONNECTED 1
 #endif
+#ifndef DRM_MODE_DISCONNECTED
+#define DRM_MODE_DISCONNECTED 2
+#endif
+#ifndef DRM_MODE_UNKNOWNCONNECTION
+#define DRM_MODE_UNKNOWNCONNECTION 3
+#endif
 
 typedef struct {
     uint32_t conn_id, crtc_id, fb_id, handle;
     uint64_t size;
     struct drm_mode_modeinfo mode;
     struct drm_mode_crtc saved;   // CRTC state before we touched it
+    void *map;                    // mmap'd scanout buffer (what the CRTC displays)
+    void *shadow;                 // off-screen render target handed to the caller
 } Priv;
 
 static int fail(int fd, char *err, int errlen, const char *what) {
@@ -45,7 +53,12 @@ int wendy_kms_open(const char *path, WendyKMSDisplay *out, char *err, int errlen
     struct drm_mode_card_res res; memset(&res, 0, sizeof res);
     if (ioctl(fd, DRM_IOCTL_MODE_GETRESOURCES, &res)) return fail(fd, err, errlen, "GETRESOURCES count");
 
-    uint64_t conn_ids[32], crtc_ids[32], enc_ids[32], fb_ids[32];
+    // DRM resource id arrays are __u32 in the kernel uapi (drm_mode_card_res).
+    // They MUST be uint32_t, not uint64_t: the kernel packs count_* consecutive
+    // u32 ids, so a u64 array reads two ids into each slot and yields garbage for
+    // every element past the first (missing the 2nd+ connector/crtc entirely — the
+    // real connected display on multi-connector boards like the Raspberry Pi).
+    uint32_t conn_ids[32], crtc_ids[32], enc_ids[32], fb_ids[32];
     if (res.count_connectors > 32) res.count_connectors = 32;
     if (res.count_crtcs > 32) res.count_crtcs = 32;
     if (res.count_encoders > 32) res.count_encoders = 32;
@@ -56,29 +69,41 @@ int wendy_kms_open(const char *path, WendyKMSDisplay *out, char *err, int errlen
     res.fb_id_ptr        = (uint64_t)(uintptr_t)fb_ids;
     if (ioctl(fd, DRM_IOCTL_MODE_GETRESOURCES, &res)) return fail(fd, err, errlen, "GETRESOURCES");
 
-    printf("kms: %u connectors, %u crtcs\n", res.count_connectors, res.count_crtcs);
-
-    // Print full crtc_ids list.
-    printf("kms: crtc_ids = [");
+    // Diagnostics go to stderr (unbuffered): a display app that fails to open
+    // KMS keeps running (display-only), so buffered stdout is never flushed and
+    // these lines would be lost exactly when they are needed.
+    fprintf(stderr, "kms: %u connectors, %u crtcs\n", res.count_connectors, res.count_crtcs);
+    fprintf(stderr, "kms: crtc_ids = [");
     for (uint32_t i = 0; i < res.count_crtcs; i++) {
-        printf("%s%u", i ? ", " : "", (uint32_t)crtc_ids[i]);
+        fprintf(stderr, "%s%u", i ? ", " : "", (uint32_t)crtc_ids[i]);
     }
-    printf("]\n");
+    fprintf(stderr, "]\n");
 
-    // Find a connected connector with at least one mode.
+    // Pick a usable connector + mode. Prefer a CONNECTED connector; fall back to
+    // one reporting UNKNOWN connection, which DSI/eDP panels (e.g. the Raspberry
+    // Pi touch display) commonly do even while actively driving the panel. A
+    // DISCONNECTED connector or one with no modes is never used.
     uint32_t chosen_conn = 0, chosen_enc = 0;
     uint32_t chosen_conn_enc_ids[32]; uint32_t chosen_conn_nenc = 0;
     struct drm_mode_modeinfo chosen_mode; memset(&chosen_mode, 0, sizeof chosen_mode);
-    int found = 0;
-    for (uint32_t i = 0; i < res.count_connectors && !found; i++) {
+    int found = 0, chosen_is_connected = 0;
+    for (uint32_t i = 0; i < res.count_connectors; i++) {
         struct drm_mode_get_connector conn; memset(&conn, 0, sizeof conn);
         conn.connector_id = (uint32_t)conn_ids[i];
-        if (ioctl(fd, DRM_IOCTL_MODE_GETCONNECTOR, &conn)) continue; // pass 1: counts
+        if (ioctl(fd, DRM_IOCTL_MODE_GETCONNECTOR, &conn)) { // pass 1: counts
+            fprintf(stderr, "kms: connector id=%u GETCONNECTOR failed: %s\n",
+                    (uint32_t)conn_ids[i], strerror(errno));
+            continue;
+        }
 
-        printf("kms: connector id=%u connection=%u modes=%u encoders=%u\n",
-               conn.connector_id, conn.connection, conn.count_modes, conn.count_encoders);
+        fprintf(stderr, "kms: connector id=%u connection=%u modes=%u encoders=%u\n",
+                conn.connector_id, conn.connection, conn.count_modes, conn.count_encoders);
 
-        if (conn.connection != DRM_MODE_CONNECTED || conn.count_modes == 0) continue;
+        if (conn.count_modes == 0 || conn.connection == DRM_MODE_DISCONNECTED) continue;
+        int is_connected = (conn.connection == DRM_MODE_CONNECTED);
+        // Keep the best we have: once a CONNECTED connector is chosen, don't
+        // replace it; and never downgrade a CONNECTED pick with an UNKNOWN one.
+        if (found && (chosen_is_connected || !is_connected)) continue;
 
         struct drm_mode_modeinfo modes[64];
         uint32_t encs[32];
@@ -96,8 +121,10 @@ int wendy_kms_open(const char *path, WendyKMSDisplay *out, char *err, int errlen
         chosen_conn_nenc = nencs;
         for (uint32_t j = 0; j < nencs; j++) chosen_conn_enc_ids[j] = encs[j];
         found = 1;
+        chosen_is_connected = is_connected;
+        if (is_connected) break; // best possible; stop scanning
     }
-    if (!found) { snprintf(err, errlen, "no connected connector with a mode"); close(fd); return -ENODEV; }
+    if (!found) { snprintf(err, errlen, "no connector (connected or unknown) with a mode"); close(fd); return -ENODEV; }
 
     // CRTC: select via possible_crtcs bitmask from all of the connector's encoders.
     // Priority:
@@ -163,7 +190,7 @@ int wendy_kms_open(const char *path, WendyKMSDisplay *out, char *err, int errlen
 
     if (!crtc_id) { snprintf(err, errlen, "no usable CRTC"); close(fd); return -ENODEV; }
 
-    printf("kms: chosen connector=%u mode=%ux%u encoder=%u possible_crtcs=0x%x -> crtc=%u (resource index %d)\n",
+    fprintf(stderr, "kms: chosen connector=%u mode=%ux%u encoder=%u possible_crtcs=0x%x -> crtc=%u (resource index %d)\n",
            chosen_conn, chosen_mode.hdisplay, chosen_mode.vdisplay,
            chosen_enc_for_log, chosen_possible_crtcs, crtc_id, crtc_idx);
 
@@ -185,6 +212,15 @@ int wendy_kms_open(const char *path, WendyKMSDisplay *out, char *err, int errlen
     if (map == MAP_FAILED) return fail(fd, err, errlen, "mmap");
     memset(map, 0, creq.size);
 
+    // Double-buffer: the caller renders into an off-screen shadow buffer (plain
+    // RAM), and wendy_kms_present blits it to the scanned-out mmap in one memcpy.
+    // Rendering straight into the mmap makes every rect/glyph appear on screen as
+    // it is drawn — a visible top-to-bottom repaint. A single linear memcpy per
+    // frame makes the update effectively atomic instead.
+    void *shadow = malloc(creq.size);
+    if (!shadow) { munmap(map, creq.size); return fail(fd, err, errlen, "malloc shadow"); }
+    memset(shadow, 0, creq.size);
+
     // Save current CRTC, then scan out our framebuffer.
     struct drm_mode_crtc saved; memset(&saved, 0, sizeof saved);
     saved.crtc_id = crtc_id;
@@ -201,9 +237,10 @@ int wendy_kms_open(const char *path, WendyKMSDisplay *out, char *err, int errlen
     if (!p) { munmap(map, creq.size); return fail(fd, err, errlen, "calloc"); }
     p->conn_id = chosen_conn; p->crtc_id = crtc_id; p->fb_id = fb.fb_id;
     p->handle = creq.handle; p->size = creq.size; p->mode = chosen_mode; p->saved = saved;
+    p->map = map; p->shadow = shadow;
 
     out->fd = fd; out->width = creq.width; out->height = creq.height;
-    out->stride = creq.pitch; out->pixels = map; out->_priv = p;
+    out->stride = creq.pitch; out->pixels = shadow; out->_priv = p;
     return 0;
 }
 
@@ -218,7 +255,8 @@ void wendy_kms_close(WendyKMSDisplay *d) {
             p->saved.count_connectors = 1;
             ioctl(d->fd, DRM_IOCTL_MODE_SETCRTC, &p->saved);
         }
-        if (d->pixels && d->pixels != MAP_FAILED) munmap(d->pixels, p->size);
+        if (p->map && p->map != MAP_FAILED) munmap(p->map, p->size);
+        free(p->shadow);
         if (p->fb_id) { uint32_t fbid = p->fb_id; ioctl(d->fd, DRM_IOCTL_MODE_RMFB, &fbid); }
         if (p->handle) {
             struct drm_mode_destroy_dumb dreq; memset(&dreq, 0, sizeof dreq);
@@ -235,8 +273,11 @@ void wendy_kms_close(WendyKMSDisplay *d) {
 void wendy_kms_present(WendyKMSDisplay *d) {
     if (!d || d->fd < 0 || !d->_priv) return;
     Priv *p = (Priv *)d->_priv;
+    // 0. Blit the off-screen shadow to the scanout buffer in one pass, so the
+    // display never shows a partially-rendered frame.
+    if (p->shadow && p->map) memcpy(p->map, p->shadow, p->size);
     // 1. Flush CPU cache for the mapped framebuffer.
-    if (d->pixels) msync(d->pixels, p->size, MS_SYNC);
+    if (p->map) msync(p->map, p->size, MS_SYNC);
     // 2. Tell the driver the whole framebuffer is dirty (preferred present path).
     struct drm_mode_fb_dirty_cmd dirty;
     memset(&dirty, 0, sizeof dirty);

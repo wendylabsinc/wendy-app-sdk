@@ -9,6 +9,17 @@ public final class FontFace {
     private let count: Int
     private var info = stbtt_fontinfo()
 
+    // Rasterizing a glyph runs stb_truetype's outline rasterizer, which is far
+    // too expensive to repeat for every glyph on every frame (a full-screen
+    // software redraw would re-rasterize the same characters continuously). The
+    // coverage for a (glyph, size) pair never changes, so cache it. The key uses
+    // the pxSize bit pattern for an exact, hash-stable match. Guarded by a lock
+    // because FontFace is @unchecked Sendable; rendering is single-threaded in
+    // practice, so the lock is essentially always uncontended.
+    private struct GlyphKey: Hashable { let scalar: UInt32; let pxBits: UInt32 }
+    private var glyphCache: [GlyphKey: GlyphCoverage] = [:]
+    private let cacheLock = NSLock()
+
     public init?(ttf bytes: [UInt8]) {
         guard !bytes.isEmpty else {
             data = nil
@@ -31,6 +42,12 @@ public final class FontFace {
     deinit { data?.deallocate() }
 
     public func rasterize(_ scalar: Unicode.Scalar, pxSize: Float) -> GlyphCoverage {
+        let key = GlyphKey(scalar: scalar.value, pxBits: pxSize.bitPattern)
+        cacheLock.lock()
+        let cached = glyphCache[key]
+        cacheLock.unlock()
+        if let cached { return cached }
+
         let scale = stbtt_ScaleForPixelHeight(&info, pxSize)
         var advance: Int32 = 0, lsb: Int32 = 0
         stbtt_GetCodepointHMetrics(&info, Int32(scalar.value), &advance, &lsb)
@@ -46,11 +63,15 @@ public final class FontFace {
                 if let dest = buf.baseAddress { _ = memcpy(dest, bmp, n) }
             }
         }
-        return GlyphCoverage(
+        let coverage = GlyphCoverage(
             width: Int(w), height: Int(h),
             bearingX: Int(xoff), bearingY: Int(yoff),
             advance: Float(advance) * scale, pixels: pixels
         )
+        cacheLock.lock()
+        glyphCache[key] = coverage
+        cacheLock.unlock()
+        return coverage
     }
 
     public func measure(_ string: String, pxSize: Float) -> (width: Float, height: Float) {

@@ -4,6 +4,7 @@ import SwiftCrossUI
 import WendyCanvas
 import WendyTextKit
 import WendyKMSDRM
+import WendyKMSInput
 
 // LVGLBackend pattern: declare the typealias in the backend itself so that any
 // module that imports WendyKMSBackend (directly or via WendyUI) automatically
@@ -36,9 +37,22 @@ public final class WendyKMSBackend: BaseAppBackend {
     private var windows: [KMSWindow] = []
     private var renderTimer: DispatchSourceTimer?
 
+    /// Cached to avoid re-parsing the embedded TTF on every text measurement/render.
+    private static let sharedFont = FontFace.bundled()
+
+    // Touch input (set up on first successful window open; nil off-device).
+    var inputDevice = WendyInputDevice()
+    var inputSource: DispatchSourceRead?
+    var tapRecognizer = TapRecognizer(slop: 24)
+    var pressedWidget: KMSWidget?
+    let touchOrientation = TouchOrientation.fromEnvironment()
+
     public init() {}
 
-    deinit { renderTimer?.cancel() }
+    deinit {
+        renderTimer?.cancel()
+        inputSource?.cancel()
+    }
 
     // MARK: Run loop
 
@@ -93,11 +107,25 @@ public final class WendyKMSBackend: BaseAppBackend {
 
     public func createWindow(withDefaultSize defaultSize: SIMD2<Int>?) -> KMSWindow {
         let window = KMSWindow()
-        let path = ProcessInfo.processInfo.environment["WENDY_KMS_DEVICE"] ?? "/dev/dri/card0"
-        var errBuf = [CChar](repeating: 0, count: 256)
-        if wendy_kms_open(path, &window.display, &errBuf, 256) == 0, window.display.pixels != nil {
-            window.isOpen = true
+        // Which DRM node scans out is not portable: it is card0 on Tegra
+        // (Jetson) but card1 on Raspberry Pi, where card0 is the V3D render
+        // node. So probe the common nodes in order and keep the first that
+        // opens with a usable framebuffer. WENDY_KMS_DEVICE, when set, pins a
+        // single node and skips probing.
+        let candidates: [String]
+        if let override = ProcessInfo.processInfo.environment["WENDY_KMS_DEVICE"], !override.isEmpty {
+            candidates = [override]
         } else {
+            candidates = ["/dev/dri/card0", "/dev/dri/card1", "/dev/dri/card2"]
+        }
+        for path in candidates {
+            var errBuf = [CChar](repeating: 0, count: 256)
+            if wendy_kms_open(path, &window.display, &errBuf, 256) == 0, window.display.pixels != nil {
+                window.isOpen = true
+                FileHandle.standardError.write(Data("WendyKMSBackend: opened \(path)\n".utf8))
+                setupTouchInput(for: window)
+                break
+            }
             let msg = errBuf.withUnsafeBytes {
                 String(bytes: $0.prefix(while: { $0 != 0 }), encoding: .utf8) ?? ""
             }
@@ -171,6 +199,7 @@ public final class WendyKMSBackend: BaseAppBackend {
     public func naturalSize(of widget: KMSWidget) -> SIMD2<Int> {
         switch widget.kind {
         case .image: return SIMD2(widget.imgWidth, widget.imgHeight)
+        case .button: return widget.naturalButtonSize
         default: return .zero
         }
     }
@@ -246,7 +275,7 @@ public final class WendyKMSBackend: BaseAppBackend {
         proposedHeight: Int?,
         environment: EnvironmentValues
     ) -> SIMD2<Int> {
-        let m = FontFace.bundled().measure(text, pxSize: pxSize(for: environment))
+        let m = Self.sharedFont.measure(text, pxSize: pxSize(for: environment))
         return SIMD2(Int(m.width.rounded(.up)), Int(m.height.rounded(.up)))
     }
 
@@ -299,14 +328,46 @@ public final class WendyKMSBackend: BaseAppBackend {
 
     // MARK: Controls — Buttons
 
-    public func createButton() -> KMSWidget { KMSWidget(.container) }
+    public func createButton() -> KMSWidget { KMSWidget(.button) }
 
     public func updateButton(
         _ button: KMSWidget,
         label: String,
         environment: EnvironmentValues,
         action: @escaping () -> Void
-    ) {}
+    ) {
+        _updateButtonStorage(
+            button,
+            label: label,
+            pxSize: pxSize(for: environment),
+            color: WendyKMSBackend.toColor(
+                environment.suggestedForegroundColor.resolve(in: environment)),
+            action: action
+        )
+    }
+
+    /// Environment-free storage core so unit tests can drive it (EnvironmentValues
+    /// has a package-gated init upstream — same pattern as _updateImageStorage).
+    func _updateButtonStorage(
+        _ button: KMSWidget,
+        label: String,
+        pxSize: Float,
+        color: WendyCanvas.Color,
+        action: @escaping () -> Void
+    ) {
+        button.label = label
+        button.buttonPxSize = pxSize
+        button.textColor = color
+        button.action = action
+        // Natural size = label measurement + padding proportional to the type
+        // size (full em horizontally, half em vertically — split per side).
+        let m = Self.sharedFont.measure(label, pxSize: pxSize)
+        button.naturalButtonSize = SIMD2(
+            Int(m.width.rounded(.up)) + Int(pxSize),
+            Int(m.height.rounded(.up)) + Int(pxSize * 0.5)
+        )
+        markAllDirty()
+    }
 
     // MARK: Controls — ToggleButtons
 
