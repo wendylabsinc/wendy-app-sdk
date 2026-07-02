@@ -37,6 +37,9 @@ public final class WendyKMSBackend: BaseAppBackend {
     private var windows: [KMSWindow] = []
     private var renderTimer: DispatchSourceTimer?
 
+    /// Cached to avoid re-parsing the embedded TTF on every text measurement/render.
+    private static let sharedFont = FontFace.bundled()
+
     // Touch input (set up on first successful window open; nil off-device).
     var inputDevice = WendyInputDevice()
     var inputSource: DispatchSourceRead?
@@ -259,7 +262,7 @@ public final class WendyKMSBackend: BaseAppBackend {
         proposedHeight: Int?,
         environment: EnvironmentValues
     ) -> SIMD2<Int> {
-        let m = FontFace.bundled().measure(text, pxSize: pxSize(for: environment))
+        let m = Self.sharedFont.measure(text, pxSize: pxSize(for: environment))
         return SIMD2(Int(m.width.rounded(.up)), Int(m.height.rounded(.up)))
     }
 
@@ -345,7 +348,7 @@ public final class WendyKMSBackend: BaseAppBackend {
         button.action = action
         // Natural size = label measurement + padding proportional to the type
         // size (full em horizontally, half em vertically — split per side).
-        let m = FontFace.bundled().measure(label, pxSize: pxSize)
+        let m = Self.sharedFont.measure(label, pxSize: pxSize)
         button.naturalButtonSize = SIMD2(
             Int(m.width.rounded(.up)) + Int(pxSize),
             Int(m.height.rounded(.up)) + Int(pxSize * 0.5)

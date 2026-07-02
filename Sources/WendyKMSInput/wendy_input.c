@@ -78,6 +78,7 @@ int wendy_input_poll(WendyInputDevice *d, WendyTouchEvent *out, int cap) {
     int emitted = 0;
     struct input_event evs[64];
     for (;;) {
+        if (emitted == cap) return emitted;
         ssize_t n = read(d->fd, evs, sizeof(evs));
         if (n < 0) {
             if (errno == EAGAIN || errno == EWOULDBLOCK || errno == EINTR)
