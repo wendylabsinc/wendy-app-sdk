@@ -190,7 +190,7 @@ int wendy_kms_open(const char *path, WendyKMSDisplay *out, char *err, int errlen
 
     if (!crtc_id) { snprintf(err, errlen, "no usable CRTC"); close(fd); return -ENODEV; }
 
-    printf("kms: chosen connector=%u mode=%ux%u encoder=%u possible_crtcs=0x%x -> crtc=%u (resource index %d)\n",
+    fprintf(stderr, "kms: chosen connector=%u mode=%ux%u encoder=%u possible_crtcs=0x%x -> crtc=%u (resource index %d)\n",
            chosen_conn, chosen_mode.hdisplay, chosen_mode.vdisplay,
            chosen_enc_for_log, chosen_possible_crtcs, crtc_id, crtc_idx);
 

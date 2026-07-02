@@ -66,9 +66,20 @@ let package = Package(
             name: "WendyTextKit",
             dependencies: ["CStbTrueType", "CWendyFont"],
             // Font and license kept on disk for provenance; no longer SwiftPM resources.
-            exclude: ["Resources"]
+            exclude: ["Resources"],
+            // Always optimize the software renderer, even in debug builds. These
+            // targets are tight per-pixel/per-glyph loops; unoptimized they push a
+            // full-screen redraw to ~600ms (≈1.6 fps) on device. `wendy run` cross-
+            // compiles the container image in debug, so without this the on-device
+            // UI is unusably slow. Allowed because consumers depend on this package
+            // by path, not by version.
+            swiftSettings: [.unsafeFlags(["-O"])]
         ),
-        .target(name: "WendyCanvas", dependencies: ["WendyTextKit"]),
+        .target(
+            name: "WendyCanvas",
+            dependencies: ["WendyTextKit"],
+            swiftSettings: [.unsafeFlags(["-O"])]  // see WendyTextKit: optimize the renderer in all configs
+        ),
         .target(
             name: "WendyKMSDRM",
             cSettings: [
@@ -94,6 +105,8 @@ let package = Package(
                 // cross-module sendability mismatch while keeping the rest of the
                 // package in Swift 6 mode.
                 .swiftLanguageMode(.v5),
+                // Optimize the backend's render loop even in debug (see WendyTextKit).
+                .unsafeFlags(["-O"]),
             ]
         ),
         .testTarget(name: "WendyKMSBackendTests", dependencies: ["WendyKMSBackend"]),
