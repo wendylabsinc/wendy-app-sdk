@@ -77,4 +77,30 @@ public struct WendyAgent: Sendable {
             }
         }
     }
+
+    /// Starts a stopped app (StartContainer server-streaming RPC). The stream
+    /// carries a Started marker plus console output; we consume until Started
+    /// (or stream end) and return — output is not surfaced here.
+    public func startApp(named appName: String) async throws {
+        try await withClient { client in
+            let containers = Wendy_Agent_Services_V1_WendyContainerService.Client(wrapping: client)
+            var request = Wendy_Agent_Services_V1_StartContainerRequest()
+            request.appName = appName
+            try await containers.startContainer(request) { response in
+                for try await msg in response.messages {
+                    if case .started(_)? = msg.responseType { break }
+                }
+            }
+        }
+    }
+
+    /// Stops a running app (StopContainer unary RPC).
+    public func stopApp(named appName: String) async throws {
+        try await withClient { client in
+            let containers = Wendy_Agent_Services_V1_WendyContainerService.Client(wrapping: client)
+            var request = Wendy_Agent_Services_V1_StopContainerRequest()
+            request.appName = appName
+            _ = try await containers.stopContainer(request) { try $0.message }
+        }
+    }
 }
