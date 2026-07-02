@@ -24,6 +24,8 @@ public enum KMSRenderer {
             if w.imgWidth > 0, w.imgHeight > 0 {
                 canvas.blitImage(w.rgba, width: w.imgWidth, height: w.imgHeight, x: originX, y: originY)
             }
+        case .button:
+            break  // TODO: Task 4: button rendering
         }
         for child in w.children {
             draw(child.widget, originX: originX + child.position.x,

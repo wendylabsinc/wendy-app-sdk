@@ -36,3 +36,28 @@ struct TapRecognizer {
         return dx * dx + dy * dy > slop * slop
     }
 }
+
+/// Hit-testing over the retained KMSWidget tree. Positions are parent-relative
+/// (as KMSRenderer paints them); later siblings paint later, i.e. on top, so
+/// they win overlaps. Only widgets with a non-nil `action` are hittable —
+/// everything else is transparent to touches.
+enum KMSHitTest {
+    static func actionTarget(in root: KMSWidget, at point: SIMD2<Int>) -> KMSWidget? {
+        target(in: root, origin: .zero, point: point)
+    }
+
+    private static func target(
+        in widget: KMSWidget, origin: SIMD2<Int>, point: SIMD2<Int>
+    ) -> KMSWidget? {
+        for child in widget.children.reversed() {
+            if let hit = target(in: child.widget, origin: origin &+ child.position, point: point) {
+                return hit
+            }
+        }
+        guard widget.action != nil,
+              point.x >= origin.x, point.y >= origin.y,
+              point.x < origin.x + widget.size.x, point.y < origin.y + widget.size.y
+        else { return nil }
+        return widget
+    }
+}
