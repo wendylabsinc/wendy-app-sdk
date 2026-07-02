@@ -51,7 +51,12 @@ int wendy_kms_open(const char *path, WendyKMSDisplay *out, char *err, int errlen
     struct drm_mode_card_res res; memset(&res, 0, sizeof res);
     if (ioctl(fd, DRM_IOCTL_MODE_GETRESOURCES, &res)) return fail(fd, err, errlen, "GETRESOURCES count");
 
-    uint64_t conn_ids[32], crtc_ids[32], enc_ids[32], fb_ids[32];
+    // DRM resource id arrays are __u32 in the kernel uapi (drm_mode_card_res).
+    // They MUST be uint32_t, not uint64_t: the kernel packs count_* consecutive
+    // u32 ids, so a u64 array reads two ids into each slot and yields garbage for
+    // every element past the first (missing the 2nd+ connector/crtc entirely — the
+    // real connected display on multi-connector boards like the Raspberry Pi).
+    uint32_t conn_ids[32], crtc_ids[32], enc_ids[32], fb_ids[32];
     if (res.count_connectors > 32) res.count_connectors = 32;
     if (res.count_crtcs > 32) res.count_crtcs = 32;
     if (res.count_encoders > 32) res.count_encoders = 32;
@@ -83,7 +88,11 @@ int wendy_kms_open(const char *path, WendyKMSDisplay *out, char *err, int errlen
     for (uint32_t i = 0; i < res.count_connectors; i++) {
         struct drm_mode_get_connector conn; memset(&conn, 0, sizeof conn);
         conn.connector_id = (uint32_t)conn_ids[i];
-        if (ioctl(fd, DRM_IOCTL_MODE_GETCONNECTOR, &conn)) continue; // pass 1: counts
+        if (ioctl(fd, DRM_IOCTL_MODE_GETCONNECTOR, &conn)) { // pass 1: counts
+            fprintf(stderr, "kms: connector id=%u GETCONNECTOR failed: %s\n",
+                    (uint32_t)conn_ids[i], strerror(errno));
+            continue;
+        }
 
         fprintf(stderr, "kms: connector id=%u connection=%u modes=%u encoders=%u\n",
                 conn.connector_id, conn.connection, conn.count_modes, conn.count_encoders);
