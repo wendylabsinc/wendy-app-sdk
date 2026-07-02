@@ -29,6 +29,8 @@ typedef struct {
     uint64_t size;
     struct drm_mode_modeinfo mode;
     struct drm_mode_crtc saved;   // CRTC state before we touched it
+    void *map;                    // mmap'd scanout buffer (what the CRTC displays)
+    void *shadow;                 // off-screen render target handed to the caller
 } Priv;
 
 static int fail(int fd, char *err, int errlen, const char *what) {
@@ -210,6 +212,15 @@ int wendy_kms_open(const char *path, WendyKMSDisplay *out, char *err, int errlen
     if (map == MAP_FAILED) return fail(fd, err, errlen, "mmap");
     memset(map, 0, creq.size);
 
+    // Double-buffer: the caller renders into an off-screen shadow buffer (plain
+    // RAM), and wendy_kms_present blits it to the scanned-out mmap in one memcpy.
+    // Rendering straight into the mmap makes every rect/glyph appear on screen as
+    // it is drawn — a visible top-to-bottom repaint. A single linear memcpy per
+    // frame makes the update effectively atomic instead.
+    void *shadow = malloc(creq.size);
+    if (!shadow) { munmap(map, creq.size); return fail(fd, err, errlen, "malloc shadow"); }
+    memset(shadow, 0, creq.size);
+
     // Save current CRTC, then scan out our framebuffer.
     struct drm_mode_crtc saved; memset(&saved, 0, sizeof saved);
     saved.crtc_id = crtc_id;
@@ -226,9 +237,10 @@ int wendy_kms_open(const char *path, WendyKMSDisplay *out, char *err, int errlen
     if (!p) { munmap(map, creq.size); return fail(fd, err, errlen, "calloc"); }
     p->conn_id = chosen_conn; p->crtc_id = crtc_id; p->fb_id = fb.fb_id;
     p->handle = creq.handle; p->size = creq.size; p->mode = chosen_mode; p->saved = saved;
+    p->map = map; p->shadow = shadow;
 
     out->fd = fd; out->width = creq.width; out->height = creq.height;
-    out->stride = creq.pitch; out->pixels = map; out->_priv = p;
+    out->stride = creq.pitch; out->pixels = shadow; out->_priv = p;
     return 0;
 }
 
@@ -243,7 +255,8 @@ void wendy_kms_close(WendyKMSDisplay *d) {
             p->saved.count_connectors = 1;
             ioctl(d->fd, DRM_IOCTL_MODE_SETCRTC, &p->saved);
         }
-        if (d->pixels && d->pixels != MAP_FAILED) munmap(d->pixels, p->size);
+        if (p->map && p->map != MAP_FAILED) munmap(p->map, p->size);
+        free(p->shadow);
         if (p->fb_id) { uint32_t fbid = p->fb_id; ioctl(d->fd, DRM_IOCTL_MODE_RMFB, &fbid); }
         if (p->handle) {
             struct drm_mode_destroy_dumb dreq; memset(&dreq, 0, sizeof dreq);
@@ -260,8 +273,11 @@ void wendy_kms_close(WendyKMSDisplay *d) {
 void wendy_kms_present(WendyKMSDisplay *d) {
     if (!d || d->fd < 0 || !d->_priv) return;
     Priv *p = (Priv *)d->_priv;
+    // 0. Blit the off-screen shadow to the scanout buffer in one pass, so the
+    // display never shows a partially-rendered frame.
+    if (p->shadow && p->map) memcpy(p->map, p->shadow, p->size);
     // 1. Flush CPU cache for the mapped framebuffer.
-    if (d->pixels) msync(d->pixels, p->size, MS_SYNC);
+    if (p->map) msync(p->map, p->size, MS_SYNC);
     // 2. Tell the driver the whole framebuffer is dirty (preferred present path).
     struct drm_mode_fb_dirty_cmd dirty;
     memset(&dirty, 0, sizeof dirty);
