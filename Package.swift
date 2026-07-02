@@ -10,6 +10,7 @@ let package = Package(
         .library(name: "WendyTextKit", targets: ["WendyTextKit"]),
         .library(name: "WendyCanvas", targets: ["WendyCanvas"]),
         .library(name: "WendyKMSDRM", targets: ["WendyKMSDRM"]),
+        .library(name: "WendyKMSInput", targets: ["WendyKMSInput"]),
         .library(name: "WendyKMSBackend", targets: ["WendyKMSBackend"]),
         .executable(name: "HelloWendy", targets: ["HelloWendy"]),
         // The headless on-device probe lives in its own package under `probe/`
@@ -78,10 +79,11 @@ let package = Package(
                 .define("__user", to: ""),
             ]
         ),
+        .target(name: "WendyKMSInput"),
         .target(
             name: "WendyKMSBackend",
             dependencies: [
-                "WendyCanvas", "WendyTextKit", "WendyKMSDRM",
+                "WendyCanvas", "WendyTextKit", "WendyKMSDRM", "WendyKMSInput",
                 .product(name: "SwiftCrossUI", package: "swift-cross-ui"),
             ],
             swiftSettings: [
