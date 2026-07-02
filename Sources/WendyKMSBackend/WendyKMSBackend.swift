@@ -107,12 +107,25 @@ public final class WendyKMSBackend: BaseAppBackend {
 
     public func createWindow(withDefaultSize defaultSize: SIMD2<Int>?) -> KMSWindow {
         let window = KMSWindow()
-        let path = ProcessInfo.processInfo.environment["WENDY_KMS_DEVICE"] ?? "/dev/dri/card0"
-        var errBuf = [CChar](repeating: 0, count: 256)
-        if wendy_kms_open(path, &window.display, &errBuf, 256) == 0, window.display.pixels != nil {
-            window.isOpen = true
-            setupTouchInput(for: window)
+        // Which DRM node scans out is not portable: it is card0 on Tegra
+        // (Jetson) but card1 on Raspberry Pi, where card0 is the V3D render
+        // node. So probe the common nodes in order and keep the first that
+        // opens with a usable framebuffer. WENDY_KMS_DEVICE, when set, pins a
+        // single node and skips probing.
+        let candidates: [String]
+        if let override = ProcessInfo.processInfo.environment["WENDY_KMS_DEVICE"], !override.isEmpty {
+            candidates = [override]
         } else {
+            candidates = ["/dev/dri/card0", "/dev/dri/card1", "/dev/dri/card2"]
+        }
+        for path in candidates {
+            var errBuf = [CChar](repeating: 0, count: 256)
+            if wendy_kms_open(path, &window.display, &errBuf, 256) == 0, window.display.pixels != nil {
+                window.isOpen = true
+                FileHandle.standardError.write(Data("WendyKMSBackend: opened \(path)\n".utf8))
+                setupTouchInput(for: window)
+                break
+            }
             let msg = errBuf.withUnsafeBytes {
                 String(bytes: $0.prefix(while: { $0 != 0 }), encoding: .utf8) ?? ""
             }
