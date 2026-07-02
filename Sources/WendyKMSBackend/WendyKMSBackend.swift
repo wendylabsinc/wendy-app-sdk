@@ -171,6 +171,7 @@ public final class WendyKMSBackend: BaseAppBackend {
     public func naturalSize(of widget: KMSWidget) -> SIMD2<Int> {
         switch widget.kind {
         case .image: return SIMD2(widget.imgWidth, widget.imgHeight)
+        case .button: return widget.naturalButtonSize
         default: return .zero
         }
     }
@@ -299,14 +300,46 @@ public final class WendyKMSBackend: BaseAppBackend {
 
     // MARK: Controls — Buttons
 
-    public func createButton() -> KMSWidget { KMSWidget(.container) }
+    public func createButton() -> KMSWidget { KMSWidget(.button) }
 
     public func updateButton(
         _ button: KMSWidget,
         label: String,
         environment: EnvironmentValues,
         action: @escaping () -> Void
-    ) {}
+    ) {
+        _updateButtonStorage(
+            button,
+            label: label,
+            pxSize: pxSize(for: environment),
+            color: WendyKMSBackend.toColor(
+                environment.suggestedForegroundColor.resolve(in: environment)),
+            action: action
+        )
+    }
+
+    /// Environment-free storage core so unit tests can drive it (EnvironmentValues
+    /// has a package-gated init upstream — same pattern as _updateImageStorage).
+    func _updateButtonStorage(
+        _ button: KMSWidget,
+        label: String,
+        pxSize: Float,
+        color: WendyCanvas.Color,
+        action: @escaping () -> Void
+    ) {
+        button.label = label
+        button.buttonPxSize = pxSize
+        button.textColor = color
+        button.action = action
+        // Natural size = label measurement + padding proportional to the type
+        // size (full em horizontally, half em vertically — split per side).
+        let m = FontFace.bundled().measure(label, pxSize: pxSize)
+        button.naturalButtonSize = SIMD2(
+            Int(m.width.rounded(.up)) + Int(pxSize),
+            Int(m.height.rounded(.up)) + Int(pxSize * 0.5)
+        )
+        markAllDirty()
+    }
 
     // MARK: Controls — ToggleButtons
 

@@ -25,7 +25,19 @@ public enum KMSRenderer {
                 canvas.blitImage(w.rgba, width: w.imgWidth, height: w.imgHeight, x: originX, y: originY)
             }
         case .button:
-            break  // TODO: Task 4: button rendering
+            // Flat filled rect; lighter while pressed for touch feedback.
+            let bg = w.pressed
+                ? Color(r: 92, g: 99, b: 110)
+                : Color(r: 52, g: 58, b: 66)
+            canvas.fillRect(x: originX, y: originY, w: w.size.x, h: w.size.y, bg)
+            if !w.label.isEmpty {
+                let m = font.measure(w.label, pxSize: w.buttonPxSize)
+                let tx = originX + max(0, (w.size.x - Int(m.width.rounded())) / 2)
+                let ty = originY + max(0, (w.size.y - Int(m.height.rounded())) / 2)
+                let baseline = ty + Int(w.buttonPxSize * 0.8)
+                canvas.drawText(w.label, x: tx, baseline: baseline,
+                                pxSize: w.buttonPxSize, color: w.textColor, font: font)
+            }
         }
         for child in w.children {
             draw(child.widget, originX: originX + child.position.x,
