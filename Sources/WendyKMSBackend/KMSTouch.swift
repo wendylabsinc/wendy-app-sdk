@@ -1,3 +1,7 @@
+import Foundation
+import Dispatch
+import WendyKMSInput
+
 /// Touch events in display-pixel space (after normalization + orientation).
 enum TouchEvent: Equatable {
     case down(SIMD2<Int>)
@@ -59,5 +63,117 @@ enum KMSHitTest {
               point.x < origin.x + widget.size.x, point.y < origin.y + widget.size.y
         else { return nil }
         return widget
+    }
+}
+
+/// Maps the shim's normalized (0…1) coordinates to display pixels, with env
+/// overrides for panels whose touch matrix is rotated/mirrored relative to the
+/// framebuffer: WENDY_TOUCH_SWAP_XY, WENDY_TOUCH_INVERT_X, WENDY_TOUCH_INVERT_Y
+/// (set to "1" to enable).
+struct TouchOrientation {
+    let swapXY: Bool
+    let invertX: Bool
+    let invertY: Bool
+
+    static func fromEnvironment() -> TouchOrientation {
+        func flag(_ name: String) -> Bool {
+            ProcessInfo.processInfo.environment[name] == "1"
+        }
+        return TouchOrientation(
+            swapXY: flag("WENDY_TOUCH_SWAP_XY"),
+            invertX: flag("WENDY_TOUCH_INVERT_X"),
+            invertY: flag("WENDY_TOUCH_INVERT_Y")
+        )
+    }
+
+    func pixelPoint(nx: Float, ny: Float, width: Int, height: Int) -> SIMD2<Int> {
+        var x = swapXY ? ny : nx
+        var y = swapXY ? nx : ny
+        if invertX { x = 1 - x }
+        if invertY { y = 1 - y }
+        return SIMD2(
+            min(width - 1, max(0, Int(x * Float(width)))),
+            min(height - 1, max(0, Int(y * Float(height))))
+        )
+    }
+}
+
+extension WendyKMSBackend {
+    /// Opens the touch device and attaches a main-queue read source. Called once,
+    /// from the first successful `createWindow`. Missing hardware is not an
+    /// error: log one line and stay display-only.
+    @MainActor func setupTouchInput(for window: KMSWindow) {
+        guard inputSource == nil else { return }
+        var err = [CChar](repeating: 0, count: 1024)
+        guard wendy_input_open(&inputDevice, &err, 1024) == 0 else {
+            let msg = err.withUnsafeBytes {
+                String(bytes: $0.prefix(while: { $0 != 0 }), encoding: .utf8) ?? ""
+            }
+            FileHandle.standardError.write(Data(
+                "WendyKMSBackend: touch input unavailable (display-only): \(msg)\n".utf8))
+            return
+        }
+        // ~24 px slop at 1080p, scaled with the panel.
+        tapRecognizer = TapRecognizer(slop: max(8, Int(window.display.height) / 45))
+        let source = DispatchSource.makeReadSource(
+            fileDescriptor: wendy_input_fd(&inputDevice), queue: .main)
+        source.setEventHandler { [weak self, weak window] in
+            guard let self, let window else { return }
+            MainActor.assumeIsolated { self.drainTouchEvents(window: window) }
+        }
+        source.resume()
+        inputSource = source
+    }
+
+    @MainActor func drainTouchEvents(window: KMSWindow) {
+        var raw = [WendyTouchEvent](repeating: WendyTouchEvent(), count: 64)
+        while true {
+            let n = Int(wendy_input_poll(&inputDevice, &raw, 64))
+            if n < 0 {
+                // Device gone: stop polling, keep rendering.
+                FileHandle.standardError.write(Data(
+                    "WendyKMSBackend: touch device lost; continuing display-only\n".utf8))
+                inputSource?.cancel()
+                inputSource = nil
+                wendy_input_close(&inputDevice)
+                return
+            }
+            if n == 0 { return }
+            for i in 0..<n {
+                let p = touchOrientation.pixelPoint(
+                    nx: raw[i].x, ny: raw[i].y,
+                    width: Int(window.display.width), height: Int(window.display.height))
+                let event: TouchEvent
+                switch raw[i].kind {
+                case Int32(WENDY_TOUCH_DOWN.rawValue): event = .down(p)
+                case Int32(WENDY_TOUCH_UP.rawValue):   event = .up(p)
+                default:                                event = .move(p)
+                }
+                if let root = window.root { handleTouch(event, root: root) }
+            }
+            if n < 64 { return }
+        }
+    }
+
+    /// The testable dispatch core: pressed-state bookkeeping + tap → action.
+    @MainActor func handleTouch(_ event: TouchEvent, root: KMSWidget) {
+        if case .down(let p) = event {
+            pressedWidget = KMSHitTest.actionTarget(in: root, at: p)
+            if let w = pressedWidget {
+                w.pressed = true
+                markAllDirty()
+            }
+        }
+        let tap = tapRecognizer.handle(event)
+        if case .up = event {
+            if let w = pressedWidget {
+                w.pressed = false
+                markAllDirty()
+            }
+            // A tap always reports the down-point, so the recognized target is
+            // exactly the widget pressed on down.
+            if tap != nil { pressedWidget?.action?() }
+            pressedWidget = nil
+        }
     }
 }

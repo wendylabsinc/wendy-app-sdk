@@ -4,6 +4,7 @@ import SwiftCrossUI
 import WendyCanvas
 import WendyTextKit
 import WendyKMSDRM
+import WendyKMSInput
 
 // LVGLBackend pattern: declare the typealias in the backend itself so that any
 // module that imports WendyKMSBackend (directly or via WendyUI) automatically
@@ -36,9 +37,19 @@ public final class WendyKMSBackend: BaseAppBackend {
     private var windows: [KMSWindow] = []
     private var renderTimer: DispatchSourceTimer?
 
+    // Touch input (set up on first successful window open; nil off-device).
+    var inputDevice = WendyInputDevice()
+    var inputSource: DispatchSourceRead?
+    var tapRecognizer = TapRecognizer(slop: 24)
+    var pressedWidget: KMSWidget?
+    let touchOrientation = TouchOrientation.fromEnvironment()
+
     public init() {}
 
-    deinit { renderTimer?.cancel() }
+    deinit {
+        renderTimer?.cancel()
+        inputSource?.cancel()
+    }
 
     // MARK: Run loop
 
@@ -97,6 +108,7 @@ public final class WendyKMSBackend: BaseAppBackend {
         var errBuf = [CChar](repeating: 0, count: 256)
         if wendy_kms_open(path, &window.display, &errBuf, 256) == 0, window.display.pixels != nil {
             window.isOpen = true
+            setupTouchInput(for: window)
         } else {
             let msg = errBuf.withUnsafeBytes {
                 String(bytes: $0.prefix(while: { $0 != 0 }), encoding: .utf8) ?? ""
