@@ -46,11 +46,19 @@ public final class WendyKMSBackend: BaseAppBackend {
     var tapRecognizer = TapRecognizer(slop: 24)
     var pressedWidget: KMSWidget?
     let touchOrientation = TouchOrientation.fromEnvironment()
+    // Hotplug support: a touchscreen may not be enumerated when the app starts
+    // (USB still settling, replug, driver bind after boot), and it can drop and
+    // return at runtime. This timer keeps rescanning /dev/input until one is
+    // acquired, so touch "just works" whenever the device appears — no restart.
+    var touchRetryTimer: DispatchSourceTimer?
+    // Log "touch unavailable" only on transitions, not on every rescan.
+    var touchUnavailableLogged = false
 
     public init() {}
 
     deinit {
         renderTimer?.cancel()
+        touchRetryTimer?.cancel()
         inputSource?.cancel()
     }
 

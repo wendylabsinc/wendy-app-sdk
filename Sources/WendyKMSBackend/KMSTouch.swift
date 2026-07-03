@@ -99,20 +99,28 @@ struct TouchOrientation {
 }
 
 extension WendyKMSBackend {
-    /// Opens the touch device and attaches a main-queue read source. Called once,
-    /// from the first successful `createWindow`. Missing hardware is not an
-    /// error: log one line and stay display-only.
+    /// Attempts to open the touch device and attach a main-queue read source.
+    /// First called from `createWindow`; if no touch device is present it starts
+    /// a rescan timer and keeps trying, so a touchscreen plugged in (or replugged)
+    /// after launch is picked up without restarting the app. Missing hardware is
+    /// never an error — the app stays display-only until one appears.
     @MainActor func setupTouchInput(for window: KMSWindow) {
         guard inputSource == nil else { return }
         var err = [CChar](repeating: 0, count: 1024)
         guard wendy_input_open(&inputDevice, &err, 1024) == 0 else {
-            let msg = err.withUnsafeBytes {
-                String(bytes: $0.prefix(while: { $0 != 0 }), encoding: .utf8) ?? ""
+            if !touchUnavailableLogged {
+                touchUnavailableLogged = true
+                let msg = err.withUnsafeBytes {
+                    String(bytes: $0.prefix(while: { $0 != 0 }), encoding: .utf8) ?? ""
+                }
+                FileHandle.standardError.write(Data(
+                    "WendyKMSBackend: touch input unavailable (display-only), will keep watching for a device: \(msg)\n".utf8))
             }
-            FileHandle.standardError.write(Data(
-                "WendyKMSBackend: touch input unavailable (display-only): \(msg)\n".utf8))
+            startTouchRetry(for: window)
             return
         }
+        stopTouchRetry()
+        touchUnavailableLogged = false
         // ~24 px slop at 1080p, scaled with the panel.
         tapRecognizer = TapRecognizer(slop: max(8, Int(window.display.height) / 45))
         let source = DispatchSource.makeReadSource(
@@ -127,6 +135,30 @@ extension WendyKMSBackend {
         }
         source.resume()
         inputSource = source
+        FileHandle.standardError.write(Data("WendyKMSBackend: touch input active\n".utf8))
+    }
+
+    /// Rescan for a touch device every 2s until one is acquired. Cheap (a handful
+    /// of open()+ioctl on /dev/input/event*), idempotent, and self-stopping:
+    /// setupTouchInput calls stopTouchRetry once it succeeds.
+    @MainActor func startTouchRetry(for window: KMSWindow) {
+        guard touchRetryTimer == nil else { return }
+        let timer = DispatchSource.makeTimerSource(queue: .main)
+        timer.schedule(deadline: .now() + .seconds(2), repeating: .seconds(2))
+        timer.setEventHandler { [weak self, weak window] in
+            guard let self, let window else { return }
+            MainActor.assumeIsolated {
+                if self.inputSource == nil { self.setupTouchInput(for: window) }
+                else { self.stopTouchRetry() }
+            }
+        }
+        timer.resume()
+        touchRetryTimer = timer
+    }
+
+    @MainActor func stopTouchRetry() {
+        touchRetryTimer?.cancel()
+        touchRetryTimer = nil
     }
 
     @MainActor func drainTouchEvents(window: KMSWindow) {
@@ -134,16 +166,20 @@ extension WendyKMSBackend {
         while true {
             let n = Int(wendy_input_poll(&inputDevice, &raw, 64))
             if n < 0 {
-                // Device gone: stop polling, keep rendering.
+                // Device gone (unplugged / re-enumerated). Tear down the source and
+                // resume rescanning so it is re-acquired when it comes back — no
+                // restart needed. The cancel handler closes the fd.
                 FileHandle.standardError.write(Data(
-                    "WendyKMSBackend: touch device lost; continuing display-only\n".utf8))
+                    "WendyKMSBackend: touch device lost; watching for it to return\n".utf8))
                 inputSource?.cancel()
                 inputSource = nil
+                touchUnavailableLogged = true   // already know it's gone; don't re-log
                 if let w = pressedWidget {
                     w.pressed = false
                     markAllDirty()
                     pressedWidget = nil
                 }
+                startTouchRetry(for: window)
                 return
             }
             if n == 0 { return }
