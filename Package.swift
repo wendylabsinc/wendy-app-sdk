@@ -12,6 +12,7 @@ let package = Package(
         .library(name: "WendyKMSDRM", targets: ["WendyKMSDRM"]),
         .library(name: "WendyKMSInput", targets: ["WendyKMSInput"]),
         .library(name: "WendyKMSBackend", targets: ["WendyKMSBackend"]),
+        .library(name: "MeshFanout", targets: ["MeshFanout"]),
         .executable(name: "HelloWendy", targets: ["HelloWendy"]),
         // The headless on-device probe lives in its own package under `probe/`
         // (depends on WendyKit only, no SwiftCrossUI) so it cross-compiles and
@@ -91,6 +92,7 @@ let package = Package(
             ]
         ),
         .target(name: "WendyKMSInput"),
+        .target(name: "MeshFanout"),
         .target(
             name: "WendyKMSBackend",
             dependencies: [
@@ -114,5 +116,6 @@ let package = Package(
         .testTarget(name: "HelloWendyTests", dependencies: ["HelloWendy"]),
         .testTarget(name: "WendyTextKitTests", dependencies: ["WendyTextKit"]),
         .testTarget(name: "WendyCanvasTests", dependencies: ["WendyCanvas", "WendyTextKit"]),
+        .testTarget(name: "MeshFanoutTests", dependencies: ["MeshFanout"]),
     ]
 )
