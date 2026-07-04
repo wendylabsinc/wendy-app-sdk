@@ -21,3 +21,20 @@ func decodeFrameHeader(_ bytes: [UInt8], maxPayloadLength: Int = 1024) -> (type:
     guard length <= UInt32(maxPayloadLength) else { return nil }
     return (bytes[0], Int(length))
 }
+
+/// Sends one framed message: `[type][big-endian uint32 length][payload]`.
+@discardableResult
+func sendFrame(_ fd: Int32, type: UInt8, payload: [UInt8] = []) -> Bool {
+    let header = encodeFrameHeader(type: type, payloadLength: payload.count)
+    return sendAll(fd, header) && sendAll(fd, payload)
+}
+
+/// Reads one framed message (5-byte header + payload). Blocking. Returns
+/// nil on disconnect or a malformed/oversized length.
+func readFrame(_ fd: Int32) -> (type: UInt8, payload: [UInt8])? {
+    guard let header = recvExact(fd, count: 5),
+        let (type, length) = decodeFrameHeader(header)
+    else { return nil }
+    guard let payload = recvExact(fd, count: length) else { return nil }
+    return (type, payload)
+}
