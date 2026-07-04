@@ -92,6 +92,7 @@ struct MeshBeacon {
             log("listening on port \(listenPort)")
         } catch {
             log("failed to start listener: \(error)")
+            wendy_kms_flush_stdout()
             exit(1)
         }
 
@@ -103,11 +104,13 @@ struct MeshBeacon {
         guard wendy_kms_open(kmsPath, &display, &errBuf, 256) == 0 else {
             let msg = errBuf.withUnsafeBytes { String(bytes: $0.prefix(while: { $0 != 0 }), encoding: .utf8) ?? "" }
             log("wendy_kms_open failed: \(msg)")
+            wendy_kms_flush_stdout()
             exit(1)
         }
         guard let pixels = display.pixels else {
             log("no framebuffer mapped")
             wendy_kms_close(&display)
+            wendy_kms_flush_stdout()
             exit(1)
         }
         let screenW = Int(display.width)
