@@ -37,5 +37,14 @@ let package = Package(
             .product(name: "WendyUI", package: "wendy-app-sdk"),
             .product(name: "WendyKit", package: "wendy-app-sdk"),
         ]),
+        .executableTarget(
+            name: "RemoteCamViewer",
+            dependencies: [
+                .product(name: "WendyKMSDRM", package: "wendy-app-sdk"),
+                .product(name: "WendyCanvas", package: "wendy-app-sdk"),
+                .product(name: "WendyTextKit", package: "wendy-app-sdk"),
+                .product(name: "WendyKMSInput", package: "wendy-app-sdk"),
+            ]
+        ),
     ]
 )

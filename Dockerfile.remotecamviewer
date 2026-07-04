@@ -1,0 +1,50 @@
+# RemoteCamViewer has to be built via a Dockerfile rather than the Swift
+# buildpack: this wendy.json is multi-service (a "services" map, needed so
+# this service gets a non-empty serviceName — mesh egress wiring requires
+# isolation:"isolated" AND serviceName != "", see
+# go/internal/agent/containerd/client.go in wendyos), and wendy run's
+# multi-service build path always uses Docker regardless of any
+# --build-type/language hint.
+#
+# Build context is the repo root (see wendy.json's "context": "."), not
+# probe/ alone: probe/Package.swift depends on the parent package via
+# `.package(path: "..")` for WendyCanvas/WendyKMSDRM/WendyKMSInput/
+# WendyTextKit, which a probe/-scoped Docker build context can't see.
+# wendy.json's own "context" can't literally use ".." (the CLI rejects paths
+# escaping the app directory), so this Dockerfile lives at the repo root and
+# a copy of probe/remotecamviewer.wendy.json is swapped in as the root
+# wendy.json for this deploy (see probe/remotecamviewer.wendy.json for the
+# source of truth — the same file, just needs to sit where the build context
+# it declares actually contains everything it references).
+#
+# WORKDIR is deliberately /wendy-app-sdk, not /build: SwiftPM resolves a
+# local `.package(path:)` dependency's identity from its directory's name,
+# not the `name:` field in its Package.swift — probe/Package.swift's
+# `.product(name: "WendyUI", package: "wendy-app-sdk")` only resolves if the
+# parent package's checkout is literally in a directory named
+# "wendy-app-sdk".
+#
+# probe/ is a SHARED SwiftPM package hosting several unrelated demos
+# (AppControlDemo, DashboardDemo, TickDemo — all depend on SwiftCrossUI, a
+# root-level dependency of this repo). RemoteCamViewer deliberately does not
+# depend on SwiftCrossUI (see RemoteCamViewer.swift's header comment), so
+# `swift build --product RemoteCamViewer` only compiles what it actually
+# needs; SwiftCrossUI's package graph still has to resolve (it's declared at
+# the repo root) but none of its code gets compiled for this target.
+#
+# No system packages beyond the base Swift image are needed: WendyKMSDRM
+# vendors its own DRM UAPI headers (Sources/WendyKMSDRM/vendor/drm/*.h) and
+# talks to /dev/dri via raw ioctl() — no libdrm; WendyKMSInput talks to
+# /dev/input via raw ioctl() the same way — no extra evdev library either.
+FROM swift:6.1-noble AS build
+WORKDIR /wendy-app-sdk
+COPY Package.swift Package.resolved* ./
+COPY Sources ./Sources
+COPY probe ./probe
+WORKDIR /wendy-app-sdk/probe
+RUN swift build -c release --product RemoteCamViewer
+
+FROM swift:6.1-noble-slim
+WORKDIR /app
+COPY --from=build /wendy-app-sdk/probe/.build/release/RemoteCamViewer ./RemoteCamViewer
+CMD ["./RemoteCamViewer"]

@@ -1,0 +1,23 @@
+{
+    "appId": "sh.wendy.app-sdk-remotecam-viewer2",
+    "version": "0.1.0",
+    "platform": "linux",
+    "isolation": "isolated",
+    "services": {
+        "viewer": {
+            "context": ".",
+            "entitlements": [
+                { "type": "display" },
+                { "type": "input" },
+                {
+                    "type": "network",
+                    "mode": "mesh",
+                    "serviceCIDR": "10.99.0.0/16"
+                }
+            ],
+            "env": {
+                "REMOTE_DEVICE_ID": "${REMOTE_DEVICE_ID}"
+            }
+        }
+    }
+}

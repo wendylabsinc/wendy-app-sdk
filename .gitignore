@@ -3,3 +3,9 @@
 *.xcodeproj
 .DS_Store
 Package.resolved
+
+# Multi-service apps built from this repo root (RemoteCamViewer, MeshBeacon,
+# MeshCounter, ...) each keep a canonical Dockerfile.<appname> checked in;
+# deploying one copies it to the bare `Dockerfile` wendy CLI's build step
+# expects, so that transient copy must never itself be committed.
+/Dockerfile
