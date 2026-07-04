@@ -45,3 +45,10 @@ agent socket: /run/wendy/agent.sock
   connected to <SSID>
 === probe complete ===
 ```
+
+## Other demo apps in this package
+
+This package also hosts several standalone display/mesh demo apps (each with
+its own `wendy.json` here and its own executable target under `Sources/`) —
+see [`MESH_DEMOS.md`](./MESH_DEMOS.md) for MeshBeacon and MeshCounter, the
+mesh showcase pair.
