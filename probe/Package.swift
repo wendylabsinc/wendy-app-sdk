@@ -56,5 +56,15 @@ let package = Package(
                 .product(name: "MeshFanout", package: "wendy-app-sdk"),
             ]
         ),
+        .executableTarget(
+            name: "MeshCounter",
+            dependencies: [
+                .product(name: "WendyKMSDRM", package: "wendy-app-sdk"),
+                .product(name: "WendyCanvas", package: "wendy-app-sdk"),
+                .product(name: "WendyTextKit", package: "wendy-app-sdk"),
+                .product(name: "WendyKMSInput", package: "wendy-app-sdk"),
+                .product(name: "MeshFanout", package: "wendy-app-sdk"),
+            ]
+        ),
     ]
 )

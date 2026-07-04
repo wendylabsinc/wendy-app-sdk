@@ -1,0 +1,17 @@
+# MeshCounter has to be built via a Dockerfile rather than the Swift
+# buildpack, and built from the wendy-app-sdk repo root rather than probe/
+# alone — see wendy-app-sdk/Dockerfile.remotecamviewer for the full
+# explanation; this file is that same shape with only the --product name
+# and output binary name changed.
+FROM swift:6.1-noble AS build
+WORKDIR /wendy-app-sdk
+COPY Package.swift Package.resolved* ./
+COPY Sources ./Sources
+COPY probe ./probe
+WORKDIR /wendy-app-sdk/probe
+RUN swift build -c release --product MeshCounter
+
+FROM swift:6.1-noble-slim
+WORKDIR /app
+COPY --from=build /wendy-app-sdk/probe/.build/release/MeshCounter ./MeshCounter
+CMD ["./MeshCounter"]

@@ -1,0 +1,25 @@
+{
+    "appId": "sh.wendy.examples.meshcounter",
+    "version": "0.1.0",
+    "platform": "linux",
+    "isolation": "isolated",
+    "services": {
+        "meshcounter": {
+            "context": ".",
+            "entitlements": [
+                { "type": "display" },
+                { "type": "input" },
+                {
+                    "type": "network",
+                    "mode": "mesh",
+                    "serviceCIDR": "10.99.0.0/16",
+                    "ports": [{ "host": 9092, "container": 9092 }]
+                }
+            ],
+            "env": {
+                "MESH_PEERS": "${MESH_PEERS}",
+                "MESH_SELF": "${MESH_SELF}"
+            }
+        }
+    }
+}
