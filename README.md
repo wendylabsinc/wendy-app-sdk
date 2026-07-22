@@ -57,11 +57,11 @@ Declare entitlements in your app's `wendy.json`:
 
 ```json
 { "appId": "com.example.myapp",
-  "entitlements": [ { "type": "gpu" }, { "type": "admin" } ] }
+  "entitlements": [ { "type": "display" }, { "type": "admin" } ] }
 ```
 
 - `admin` → `WENDY_AGENT_SOCKET` for WendyKit.
-- `gpu`   → `/dev/dri` + EGL for on-device rendering.
+- `display`   → `/dev/dri` + EGL for on-device rendering.
 
 The SDK documents these but does not generate Dockerfiles or run `wendy run`.
 
