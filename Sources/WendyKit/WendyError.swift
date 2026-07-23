@@ -1,6 +1,7 @@
 import Foundation
 
 /// Errors shared by Wendy APIs.
+@nonexhaustive
 public enum WendyError: Error, Sendable, Equatable {
   /// The requested operation is not supported by the active Wendy connection.
   case notAvailableOnTransport

@@ -36,7 +36,7 @@
 # vendors its own DRM UAPI headers (Sources/WendyKMSDRM/vendor/drm/*.h) and
 # talks to /dev/dri via raw ioctl() — no libdrm; WendyKMSInput talks to
 # /dev/input via raw ioctl() the same way — no extra evdev library either.
-FROM swift:6.1-noble AS build
+FROM swift:6.3.2-noble AS build
 WORKDIR /wendy-app-sdk
 COPY Package.swift Package.resolved* ./
 COPY Sources ./Sources
@@ -44,7 +44,7 @@ COPY probe ./probe
 WORKDIR /wendy-app-sdk/probe
 RUN swift build -c release --product RemoteCamViewer
 
-FROM swift:6.1-noble-slim
+FROM swift:6.3.2-noble-slim
 WORKDIR /app
 COPY --from=build /wendy-app-sdk/probe/.build/release/RemoteCamViewer ./RemoteCamViewer
 CMD ["./RemoteCamViewer"]

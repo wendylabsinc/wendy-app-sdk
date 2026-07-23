@@ -1,4 +1,5 @@
 /// The users who should receive a Wendy notification.
+@nonexhaustive
 public enum WendyAudience: Sendable, Hashable {
   /// One Wendy user.
   case user(id: String)
