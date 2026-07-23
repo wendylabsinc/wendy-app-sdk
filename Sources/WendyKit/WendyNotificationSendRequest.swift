@@ -1,10 +1,12 @@
 /// The notification content and audience supplied by a Wendy app.
-public struct WendyNotificationSendRequest: Equatable, Sendable {
-  public var notification: WendyNotification
-
-  public init(notification: WendyNotification) {
-    self.notification = notification
-  }
+public struct WendyNotificationSendRequest: Sendable, Hashable {
+  public var audience: WendyAudience
+  public var title: String
+  public var body: String
+  public var severity: WendyNotificationSeverity
+  public var deepLink: String
+  public var sourceID: String
+  public var metadata: WendyNotificationMetadata?
 
   public init(
     audience: WendyAudience,
@@ -13,16 +15,14 @@ public struct WendyNotificationSendRequest: Equatable, Sendable {
     severity: WendyNotificationSeverity,
     deepLink: String,
     sourceID: String,
-    metadata: [String: WendyJSONValue]? = nil
+    metadata: WendyNotificationMetadata? = nil
   ) {
-    self.notification = WendyNotification(
-      audience: audience,
-      title: title,
-      body: body,
-      severity: severity,
-      deepLink: deepLink,
-      sourceID: sourceID,
-      metadata: metadata
-    )
+    self.audience = audience
+    self.title = title
+    self.body = body
+    self.severity = severity
+    self.deepLink = deepLink
+    self.sourceID = sourceID
+    self.metadata = metadata
   }
 }

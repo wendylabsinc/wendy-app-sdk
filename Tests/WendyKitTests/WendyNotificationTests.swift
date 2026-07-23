@@ -6,26 +6,30 @@ import Testing
 @testable import WendyKit
 
 @Test
-func `send request stores the shared notification domain value`() {
+func `notification model carries shared Client API context`() {
   let notification = WendyNotification(
-    audience: .organizationRole(.admin),
-    title: "Fire detected",
+    id: .init(rawValue: 7),
+    organizationID: .init(rawValue: 42),
     body: "Camera 2 detected smoke.",
     severity: .critical,
+    createdAt: Date(timeIntervalSince1970: 1_753_270_400),
+    title: "Fire detected",
     deepLink: "wendy://devices/42/live?camera=2",
-    sourceID: "fire-2026-07-23-001",
+    source: .init(id: "fire-2026-07-23-001", assetID: 9, appID: "com.example.fire"),
+    audience: .organizationRole(.admin),
     metadata: ["confidence": .number(0.98)]
   )
 
-  let request = WendyNotificationSendRequest(notification: notification)
-
-  #expect(request.notification == notification)
+  #expect(notification.id.rawValue == 7)
+  #expect(notification.organizationID.rawValue == 42)
+  #expect(notification.source?.appID == "com.example.fire")
+  #expect(notification.metadata?.values["confidence"] == .number(0.98))
 }
 
 @Test(
   arguments: [
     (WendyAudience.user(id: "user-1"), "user-1", Int32(0), nil),
-    (WendyAudience.team(id: 42), "", Int32(42), nil),
+    (WendyAudience.organizationTeam(id: 42), "", Int32(42), nil),
     (
       WendyAudience.organizationRole(.billingManager),
       "",
@@ -39,8 +43,8 @@ func `audiences map to the local System API contract`(
   userID: String,
   teamID: Int32,
   role: Wendy_System_V1_OrganizationRole?
-) throws {
-  let proto = try Wendy_System_V1_NotificationAudience(audience)
+) {
+  let proto = Wendy_System_V1_NotificationAudience(audience)
 
   #expect(proto.userID == userID)
   #expect(proto.orgTeamID == teamID)
@@ -84,7 +88,7 @@ func `send request maps content and nested JSON metadata`() throws {
 @Test
 func `absent metadata remains absent in the wire request`() throws {
   let request = WendyNotificationSendRequest(
-    audience: .team(id: 3),
+    audience: .organizationTeam(id: 3),
     title: "Inspection due",
     body: "Inspect line 2.",
     severity: .info,
@@ -113,9 +117,18 @@ func `non-finite metadata numbers are rejected before transport`() {
 }
 
 @Test
-func `team IDs outside the wire range are rejected`() {
-  #expect(throws: WendyError.invalidRequest("team ID is outside the supported range")) {
-    _ = try Wendy_System_V1_NotificationAudience(.team(id: Int.max))
+func `unspecified severity is retained for Client models but rejected when sending`() {
+  let request = WendyNotificationSendRequest(
+    audience: .user(id: "user-1"),
+    title: "Missing severity",
+    body: "This request should not be sent.",
+    severity: .unspecified,
+    deepLink: "wendy://devices/9",
+    sourceID: "missing-severity"
+  )
+
+  #expect(throws: WendyError.invalidRequest("severity must be specified")) {
+    _ = try Wendy_System_V1_SendRequest(request)
   }
 }
 

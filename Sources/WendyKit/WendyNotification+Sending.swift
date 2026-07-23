@@ -69,30 +69,26 @@ struct WendySystemNotificationTransport: WendyNotificationSending {
 
 extension Wendy_System_V1_SendRequest {
   init(_ request: WendyNotificationSendRequest) throws {
-    let notification = request.notification
     self.init()
-    self.audience = try Wendy_System_V1_NotificationAudience(notification.audience)
-    self.title = notification.title
-    self.body = notification.body
-    self.severity = Wendy_System_V1_NotificationSeverity(notification.severity)
-    self.deepLink = notification.deepLink
-    self.sourceID = notification.sourceID
-    if let metadata = notification.metadata {
-      self.metadata = try Google_Protobuf_Struct(metadata)
+    self.audience = Wendy_System_V1_NotificationAudience(request.audience)
+    self.title = request.title
+    self.body = request.body
+    self.severity = try Wendy_System_V1_NotificationSeverity(request.severity)
+    self.deepLink = request.deepLink
+    self.sourceID = request.sourceID
+    if let metadata = request.metadata {
+      self.metadata = try Google_Protobuf_Struct(metadata.values)
     }
   }
 }
 
 extension Wendy_System_V1_NotificationAudience {
-  init(_ audience: WendyAudience) throws {
+  init(_ audience: WendyAudience) {
     self.init()
     switch audience {
     case .user(let id):
       self.userID = id
-    case .team(let id):
-      guard let id = Int32(exactly: id) else {
-        throw WendyError.invalidRequest("team ID is outside the supported range")
-      }
+    case .organizationTeam(let id):
       self.orgTeamID = id
     case .organizationRole(let role):
       self.organizationRole = Wendy_System_V1_OrganizationRole(role)
@@ -101,8 +97,10 @@ extension Wendy_System_V1_NotificationAudience {
 }
 
 extension Wendy_System_V1_NotificationSeverity {
-  init(_ severity: WendyNotificationSeverity) {
+  init(_ severity: WendyNotificationSeverity) throws {
     switch severity {
+    case .unspecified:
+      throw WendyError.invalidRequest("severity must be specified")
     case .info:
       self = .info
     case .warning:

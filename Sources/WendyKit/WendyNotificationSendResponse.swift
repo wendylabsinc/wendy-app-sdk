@@ -1,5 +1,5 @@
 /// The outcome of sending a notification through WendyOS.
-public struct WendyNotificationSendResponse: Equatable, Sendable {
+public struct WendyNotificationSendResponse: Sendable, Hashable {
   public let isDuplicate: Bool
   public let recipientCount: Int
 
