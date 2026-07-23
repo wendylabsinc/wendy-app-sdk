@@ -84,7 +84,7 @@ extension Wendy_System_V1_SendRequest {
 }
 
 extension Wendy_System_V1_NotificationAudience {
-  init(_ audience: WendyNotification.Audience) throws {
+  init(_ audience: WendyAudience) throws {
     self.init()
     switch audience {
     case .user(let id):
@@ -101,7 +101,7 @@ extension Wendy_System_V1_NotificationAudience {
 }
 
 extension Wendy_System_V1_NotificationSeverity {
-  init(_ severity: WendyNotification.Severity) {
+  init(_ severity: WendyNotificationSeverity) {
     switch severity {
     case .info:
       self = .info
@@ -116,7 +116,7 @@ extension Wendy_System_V1_NotificationSeverity {
 }
 
 extension Wendy_System_V1_OrganizationRole {
-  init(_ role: WendyNotification.OrganizationRole) {
+  init(_ role: WendyOrganizationRole) {
     switch role {
     case .owner:
       self = .owner
@@ -133,14 +133,14 @@ extension Wendy_System_V1_OrganizationRole {
 }
 
 extension Google_Protobuf_Struct {
-  init(_ values: [String: WendyNotificationMetadataValue]) throws {
+  init(_ values: [String: WendyJSONValue]) throws {
     self.init()
     self.fields = try values.mapValues(Google_Protobuf_Value.init)
   }
 }
 
 extension Google_Protobuf_Value {
-  init(_ value: WendyNotificationMetadataValue) throws {
+  init(_ value: WendyJSONValue) throws {
     self.init()
     switch value {
     case .null:

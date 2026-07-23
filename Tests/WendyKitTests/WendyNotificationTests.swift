@@ -24,10 +24,10 @@ func `send request stores the shared notification domain value`() {
 
 @Test(
   arguments: [
-    (WendyNotification.Audience.user(id: "user-1"), "user-1", Int32(0), nil),
-    (WendyNotification.Audience.team(id: 42), "", Int32(42), nil),
+    (WendyAudience.user(id: "user-1"), "user-1", Int32(0), nil),
+    (WendyAudience.team(id: 42), "", Int32(42), nil),
     (
-      WendyNotification.Audience.organizationRole(.billingManager),
+      WendyAudience.organizationRole(.billingManager),
       "",
       Int32(0),
       Wendy_System_V1_OrganizationRole.billingManager
@@ -35,7 +35,7 @@ func `send request stores the shared notification domain value`() {
   ]
 )
 func `audiences map to the local System API contract`(
-  audience: WendyNotification.Audience,
+  audience: WendyAudience,
   userID: String,
   teamID: Int32,
   role: Wendy_System_V1_OrganizationRole?
