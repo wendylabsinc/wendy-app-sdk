@@ -101,7 +101,7 @@ Declare entitlements in your app's `wendy.json`:
 
 WendyOS supplies `WENDY_SYSTEM_SOCKET` only to entitled workloads. If the
 runtime is unsupported or unavailable, `send(_:)` throws
-`WendySystemAPIError.unavailable`; authorization failures throw
+`WendyError.unavailable`; authorization failures throw
 `.notificationsEntitlementRequired`.
 
 The SDK documents these but does not generate Dockerfiles or run `wendy run`.

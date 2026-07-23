@@ -107,14 +107,14 @@ func `non-finite metadata numbers are rejected before transport`() {
     metadata: ["reading": .number(.infinity)]
   )
 
-  #expect(throws: WendySystemAPIError.invalidRequest("metadata numbers must be finite")) {
+  #expect(throws: WendyError.invalidRequest("metadata numbers must be finite")) {
     _ = try Wendy_System_V1_SendRequest(request)
   }
 }
 
 @Test
 func `team IDs outside the wire range are rejected`() {
-  #expect(throws: WendySystemAPIError.invalidRequest("team ID is outside the supported range")) {
+  #expect(throws: WendyError.invalidRequest("team ID is outside the supported range")) {
     _ = try Wendy_System_V1_NotificationAudience(.team(id: Int.max))
   }
 }
@@ -133,19 +133,19 @@ func `send response exposes only delivery outcome`() {
 
 @Test(
   arguments: [
-    (RPCError.Code.permissionDenied, WendySystemAPIError.notificationsEntitlementRequired),
-    (RPCError.Code.unimplemented, WendySystemAPIError.unavailable),
+    (RPCError.Code.permissionDenied, WendyError.notificationsEntitlementRequired),
+    (RPCError.Code.unimplemented, WendyError.unavailable),
     (
       RPCError.Code.invalidArgument,
-      WendySystemAPIError.invalidRequest("title is required")
+      WendyError.invalidRequest("title is required")
     ),
   ]
 )
 func `transport failures map to domain errors`(
   code: RPCError.Code,
-  expected: WendySystemAPIError
+  expected: WendyError
 ) {
-  #expect(WendySystemAPIError(RPCError(code: code, message: "title is required")) == expected)
+  #expect(WendyError(RPCError(code: code, message: "title is required")) == expected)
 }
 
 @Test
@@ -188,7 +188,7 @@ struct WendySystemEnvironmentTests {
       sourceID: "test"
     )
 
-    await #expect(throws: WendySystemAPIError.unavailable) {
+    await #expect(throws: WendyError.unavailable) {
       _ = try await WendyNotification.send(request)
     }
   }

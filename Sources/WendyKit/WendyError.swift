@@ -1,5 +1,5 @@
 /// Errors WendyKit can diagnose while using a Wendy System API.
-public enum WendySystemAPIError: Error, Equatable, Sendable {
+public enum WendyError: Error, Equatable, Sendable {
   /// The app is not running with a supported WendyOS System API runtime.
   /// This can also mean the app did not declare the capability's entitlement.
   case unavailable
@@ -16,7 +16,7 @@ public enum WendySystemAPIError: Error, Equatable, Sendable {
 
 // MARK: - CustomStringConvertible
 
-extension WendySystemAPIError: CustomStringConvertible {
+extension WendyError: CustomStringConvertible {
   public var description: String {
     switch self {
     case .unavailable:

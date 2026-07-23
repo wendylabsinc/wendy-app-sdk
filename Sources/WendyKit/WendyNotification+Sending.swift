@@ -12,7 +12,7 @@ extension WendyNotification {
     _ request: WendyNotificationSendRequest
   ) async throws -> WendyNotificationSendResponse {
     guard let transport = WendySystemNotificationTransport.fromEnvironment() else {
-      throw WendySystemAPIError.unavailable
+      throw WendyError.unavailable
     }
 
     return try await send(request, using: transport)
@@ -60,9 +60,9 @@ struct WendySystemNotificationTransport: WendyNotificationSending {
         }
       }
     } catch let error as RPCError {
-      throw WendySystemAPIError(error)
+      throw WendyError(error)
     } catch {
-      throw WendySystemAPIError.unavailable
+      throw WendyError.unavailable
     }
   }
 }
@@ -91,7 +91,7 @@ extension Wendy_System_V1_NotificationAudience {
       self.userID = id
     case .team(let id):
       guard let id = Int32(exactly: id) else {
-        throw WendySystemAPIError.invalidRequest("team ID is outside the supported range")
+        throw WendyError.invalidRequest("team ID is outside the supported range")
       }
       self.orgTeamID = id
     case .organizationRole(let role):
@@ -149,7 +149,7 @@ extension Google_Protobuf_Value {
       self.boolValue = value
     case .number(let value):
       guard value.isFinite else {
-        throw WendySystemAPIError.invalidRequest("metadata numbers must be finite")
+        throw WendyError.invalidRequest("metadata numbers must be finite")
       }
       self.numberValue = value
     case .string(let value):
@@ -173,7 +173,7 @@ extension WendyNotificationSendResponse {
   }
 }
 
-extension WendySystemAPIError {
+extension WendyError {
   init(_ error: RPCError) {
     switch error.code {
     case .permissionDenied, .unauthenticated:
