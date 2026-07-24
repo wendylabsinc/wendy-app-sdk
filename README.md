@@ -47,7 +47,7 @@ let response = try await WendyNotification.send(
         severity: .critical,
         deepLink: "wendy://devices/current/live?camera=2",
         sourceID: "fire-2026-07-23-001",
-        metadata: ["confidence": .number(0.98)]
+        metadata: try WendyNotificationMetadata(["confidence": 0.98])
     )
 )
 
@@ -124,4 +124,4 @@ Notification domain API, never protobuf or transport types.
 ## License
 
 MIT. Dependencies: grpc-swift (Apache-2.0), SwiftProtobuf (Apache-2.0),
-SwiftCrossUI (MIT).
+IkigaJSON (MIT), and SwiftCrossUI (MIT).

@@ -1,12 +1,13 @@
 import Foundation
 import GRPCCore
+import IkigaJSON
 import SwiftProtobuf
 import Testing
 
 @testable import WendyKit
 
 @Test
-func `notification model carries shared Client API context`() {
+func `notification model carries shared Client API context`() throws {
   let notification = WendyNotification(
     id: .init(rawValue: 7),
     organizationID: .init(rawValue: 42),
@@ -17,13 +18,14 @@ func `notification model carries shared Client API context`() {
     deepLink: "wendy://devices/42/live?camera=2",
     source: .init(id: "fire-2026-07-23-001", assetID: 9, appID: "com.example.fire"),
     audience: .organizationRole(.admin),
-    metadata: ["confidence": .number(0.98)]
+    metadata: try WendyNotificationMetadata(["confidence": 0.98])
   )
 
   #expect(notification.id.rawValue == 7)
   #expect(notification.organizationID.rawValue == 42)
   #expect(notification.source?.appID == "com.example.fire")
-  #expect(notification.metadata?.values["confidence"] == .number(0.98))
+  let metadata = try notification.metadata?.jsonObject()
+  #expect(metadata?["confidence"] as? Double == 0.98)
 }
 
 @Test(
@@ -55,6 +57,14 @@ func `audiences map to the local System API contract`(
 
 @Test
 func `send request maps content and nested JSON metadata`() throws {
+  let labels: JSONArray = ["water", NSNull()]
+  let sensor: JSONObject = ["id": "pressure-4"]
+  let metadata = try WendyNotificationMetadata([
+    "acknowledged": false,
+    "reading": 12.5,
+    "labels": labels,
+    "sensor": sensor,
+  ])
   let request = WendyNotificationSendRequest(
     audience: .user(id: "operator-1"),
     title: "Leak detected",
@@ -62,12 +72,7 @@ func `send request maps content and nested JSON metadata`() throws {
     severity: .warning,
     deepLink: "wendy://devices/7/live",
     sourceID: "leak-17",
-    metadata: [
-      "acknowledged": .bool(false),
-      "reading": .number(12.5),
-      "labels": .array([.string("water"), .null]),
-      "sensor": .object(["id": .string("pressure-4")]),
-    ]
+    metadata: metadata
   )
 
   let proto = try Wendy_System_V1_SendRequest(request)
@@ -100,19 +105,29 @@ func `absent metadata remains absent in the wire request`() throws {
 }
 
 @Test
-func `non-finite metadata numbers are rejected before transport`() {
-  let request = WendyNotificationSendRequest(
-    audience: .user(id: "user-1"),
-    title: "Invalid reading",
-    body: "The sensor returned an invalid reading.",
-    severity: .error,
-    deepLink: "wendy://devices/9",
-    sourceID: "invalid-reading",
-    metadata: ["reading": .number(.infinity)]
-  )
+func `metadata is an immutable order-independent JSON snapshot`() throws {
+  var object: JSONObject = ["b": 2, "a": 1]
+  let metadata = try WendyNotificationMetadata(object)
+  let equivalent = try WendyNotificationMetadata(["a": 1, "b": 2])
 
+  object["a"] = 99
+  let snapshot = try metadata.jsonObject()
+
+  #expect(metadata == equivalent)
+  #expect(snapshot["a"] as? Int == 1)
+}
+
+@Test
+func `unsupported custom JSON values are rejected`() {
+  #expect(throws: WendyError.invalidRequest("metadata contains an unsupported JSON value")) {
+    _ = try WendyNotificationMetadata(["custom": UnsupportedJSONValue()])
+  }
+}
+
+@Test
+func `non-finite metadata numbers are rejected before transport`() {
   #expect(throws: WendyError.invalidRequest("metadata numbers must be finite")) {
-    _ = try Wendy_System_V1_SendRequest(request)
+    _ = try WendyNotificationMetadata(["reading": Double.infinity])
   }
 }
 
@@ -224,6 +239,8 @@ struct WendySystemEnvironmentTests {
         == "/run/wendy/system/system.sock")
   }
 }
+
+private struct UnsupportedJSONValue: JSONValue {}
 
 private struct StubNotificationSender: WendyNotificationSending {
   let response: WendyNotificationSendResponse

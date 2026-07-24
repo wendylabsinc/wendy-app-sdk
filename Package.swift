@@ -23,6 +23,7 @@ let package = Package(
         .package(url: "https://github.com/grpc/grpc-swift-protobuf", from: "1.0.0"),
         .package(url: "https://github.com/grpc/grpc-swift-nio-transport", from: "1.0.0"),
         .package(url: "https://github.com/apple/swift-protobuf", from: "1.28.0"),
+        .package(url: "https://github.com/orlandos-nl/swift-json.git", from: "2.5.3"),
         .package(url: "https://github.com/stackotter/swift-cross-ui", .upToNextMinor(from: "0.7.0")),
         .package(url: "https://github.com/apple/swift-container-plugin", from: "1.3.0"),
     ],
@@ -34,6 +35,7 @@ let package = Package(
                 .product(name: "GRPCNIOTransportHTTP2", package: "grpc-swift-nio-transport"),
                 .product(name: "GRPCProtobuf", package: "grpc-swift-protobuf"),
                 .product(name: "SwiftProtobuf", package: "swift-protobuf"),
+                .product(name: "IkigaJSON", package: "swift-json"),
             ],
             // Stubs are pre-generated into Generated/ (committed); .proto sources +
             // codegen config are kept for regeneration but excluded from the build,

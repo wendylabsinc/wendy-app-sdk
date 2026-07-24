@@ -1,6 +1,7 @@
 import Foundation
 import GRPCCore
 import GRPCNIOTransportHTTP2
+import IkigaJSON
 import SwiftProtobuf
 
 extension WendyNotification {
@@ -77,7 +78,7 @@ extension Wendy_System_V1_SendRequest {
     self.deepLink = request.deepLink
     self.sourceID = request.sourceID
     if let metadata = request.metadata {
-      self.metadata = try Google_Protobuf_Struct(metadata.values)
+      self.metadata = try Google_Protobuf_Struct(metadata.jsonObject())
     }
   }
 }
@@ -131,33 +132,40 @@ extension Wendy_System_V1_OrganizationRole {
 }
 
 extension Google_Protobuf_Struct {
-  init(_ values: [String: WendyJSONValue]) throws {
+  init(_ object: JSONObject) throws {
     self.init()
-    self.fields = try values.mapValues(Google_Protobuf_Value.init)
+    for key in object.keys {
+      guard let value = object[key] else { continue }
+      self.fields[key] = try Google_Protobuf_Value(value)
+    }
   }
 }
 
 extension Google_Protobuf_Value {
-  init(_ value: WendyJSONValue) throws {
+  init(_ value: any JSONValue) throws {
     self.init()
     switch value {
-    case .null:
-      self.nullValue = .nullValue
-    case .bool(let value):
+    case let value as JSONObject:
+      self.structValue = try Google_Protobuf_Struct(value)
+    case let value as JSONArray:
+      var list = Google_Protobuf_ListValue()
+      list.values = try value.map(Google_Protobuf_Value.init)
+      self.listValue = list
+    case let value as Bool:
       self.boolValue = value
-    case .number(let value):
+    case let value as String:
+      self.stringValue = value
+    case let value as Int:
+      self.numberValue = Double(value)
+    case let value as Double:
       guard value.isFinite else {
         throw WendyError.invalidRequest("metadata numbers must be finite")
       }
       self.numberValue = value
-    case .string(let value):
-      self.stringValue = value
-    case .array(let values):
-      var list = Google_Protobuf_ListValue()
-      list.values = try values.map(Google_Protobuf_Value.init)
-      self.listValue = list
-    case .object(let values):
-      self.structValue = try Google_Protobuf_Struct(values)
+    case is NSNull:
+      self.nullValue = .nullValue
+    default:
+      throw WendyError.invalidRequest("metadata contains an unsupported JSON value")
     }
   }
 }
