@@ -41,7 +41,11 @@ import WendyKit
 
 let response = try await WendyNotification.send(
     WendyNotificationSendRequest(
-        audience: .organizationRole(.owner),
+        audience: try WendyAudience(
+            userIDs: ["operator-1"],
+            teamIDs: [7, 12],
+            roles: [.owner, .admin]
+        ),
         title: "Fire detected",
         body: "Camera 2 detected smoke.",
         severity: .critical,
@@ -53,6 +57,13 @@ let response = try await WendyNotification.send(
 
 print("notified \(response.recipientCount) recipients")
 ```
+
+Audience selectors use union semantics: a recipient matching any listed user
+ID, team ID, or organization role is included, and overlapping matches still
+receive the Notification only once. WendyKit trims user IDs, requires them to
+be 1...128 safe ASCII bytes, deduplicates and sorts every selector group, and
+accepts at most 100 unique selectors in total. Wendy Cloud remains authoritative
+and caps the resolved union at 10,000 recipients.
 
 `sourceID` is an app-generated idempotency key. Reusing it from the same app
 and device returns `isDuplicate == true` without delivering the Notification

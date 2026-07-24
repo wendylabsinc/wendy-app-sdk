@@ -1,5 +1,6 @@
 /// The notification content and audience supplied by a Wendy app.
 public struct WendyNotificationSendRequest: Sendable, Hashable {
+  /// The normalized user, team, and role selector union for this delivery.
   public var audience: WendyAudience
   public var title: String
   public var body: String

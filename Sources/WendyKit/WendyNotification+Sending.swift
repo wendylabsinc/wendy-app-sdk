@@ -86,14 +86,9 @@ extension Wendy_System_V1_SendRequest {
 extension Wendy_System_V1_NotificationAudience {
   init(_ audience: WendyAudience) {
     self.init()
-    switch audience {
-    case .user(let id):
-      self.userID = id
-    case .organizationTeam(let id):
-      self.orgTeamID = id
-    case .organizationRole(let role):
-      self.organizationRole = Wendy_System_V1_OrganizationRole(role)
-    }
+    self.userIds = audience.userIDs
+    self.teamIds = audience.teamIDs
+    self.roles = audience.roles.map(Wendy_System_V1_OrganizationRole.init)
   }
 }
 

@@ -17,7 +17,7 @@ func `notification model carries shared Client API context`() throws {
     title: "Fire detected",
     deepLink: "wendy://devices/42/live?camera=2",
     source: .init(id: "fire-2026-07-23-001", assetID: 9, appID: "com.example.fire"),
-    audience: .organizationRole(.admin),
+    audience: try WendyAudience(userIDs: ["operator-1"], roles: [.admin]),
     metadata: try WendyNotificationMetadata(["confidence": 0.98])
   )
 
@@ -28,30 +28,83 @@ func `notification model carries shared Client API context`() throws {
   #expect(metadata?["confidence"] as? Double == 0.98)
 }
 
-@Test(
-  arguments: [
-    (WendyAudience.user(id: "user-1"), "user-1", Int32(0), nil),
-    (WendyAudience.organizationTeam(id: 42), "", Int32(42), nil),
-    (
-      WendyAudience.organizationRole(.billingManager),
-      "",
-      Int32(0),
-      Wendy_System_V1_OrganizationRole.billingManager
-    ),
-  ]
-)
-func `audiences map to the local System API contract`(
-  audience: WendyAudience,
-  userID: String,
-  teamID: Int32,
-  role: Wendy_System_V1_OrganizationRole?
-) {
-  let proto = Wendy_System_V1_NotificationAudience(audience)
+@Test
+func `audience normalizes and maps selector unions to the System API`() throws {
+  let audience = try WendyAudience(
+    userIDs: [" user-2 ", "user-1", "user-2"],
+    teamIDs: [42, 7, 42],
+    roles: [.viewer, .admin, .viewer]
+  )
+  let equivalent = try WendyAudience(
+    userIDs: ["user-1", "user-2"],
+    teamIDs: [7, 42],
+    roles: [.admin, .viewer]
+  )
 
-  #expect(proto.userID == userID)
-  #expect(proto.orgTeamID == teamID)
-  if let role {
-    #expect(proto.organizationRole == role)
+  #expect(audience == equivalent)
+  #expect(audience.userIDs == ["user-1", "user-2"])
+  #expect(audience.teamIDs == [7, 42])
+  #expect(audience.roles == [.admin, .viewer])
+
+  let proto = Wendy_System_V1_NotificationAudience(audience)
+  #expect(proto.userIds == ["user-1", "user-2"])
+  #expect(proto.teamIds == [7, 42])
+  #expect(proto.roles == [.admin, .viewer])
+}
+
+@Test
+func `audience requires valid selectors`() {
+  #expect(throws: WendyError.invalidRequest("audience must contain at least one selector")) {
+    _ = try WendyAudience()
+  }
+  #expect(
+    throws: WendyError.invalidRequest(
+      "audience user IDs must contain 1...128 safe ASCII bytes")
+  ) {
+    _ = try WendyAudience(userIDs: ["  "])
+  }
+  #expect(
+    throws: WendyError.invalidRequest(
+      "audience user IDs must contain 1...128 safe ASCII bytes")
+  ) {
+    _ = try WendyAudience(userIDs: ["unsafe user"])
+  }
+  #expect(
+    throws: WendyError.invalidRequest(
+      "audience user IDs must contain 1...128 safe ASCII bytes")
+  ) {
+    _ = try WendyAudience(userIDs: [String(repeating: "a", count: 129)])
+  }
+  #expect(WendyAudience.maximumUserIDByteCount == 128)
+  #expect(throws: WendyError.invalidRequest("audience team IDs must be positive")) {
+    _ = try WendyAudience(teamIDs: [0])
+  }
+}
+
+@Test
+func `audience accepts at most one hundred unique selectors total`() throws {
+  let userIDs = (0..<96).map { "user-\($0)" }
+  let audience = try WendyAudience(
+    userIDs: userIDs,
+    teamIDs: [1, 2],
+    roles: [.owner, .admin]
+  )
+
+  let duplicateHeavy = try WendyAudience(
+    userIDs: Array(repeating: "same-user", count: 101)
+  )
+
+  #expect(WendyAudience.maximumSelectorCount == 100)
+  #expect(audience.userIDs.count + audience.teamIDs.count + audience.roles.count == 100)
+  #expect(duplicateHeavy.userIDs == ["same-user"])
+  #expect(
+    throws: WendyError.invalidRequest("audience must contain at most 100 selectors")
+  ) {
+    _ = try WendyAudience(
+      userIDs: userIDs,
+      teamIDs: [1, 2],
+      roles: [.owner, .admin, .member]
+    )
   }
 }
 
@@ -66,7 +119,11 @@ func `send request maps content and nested JSON metadata`() throws {
     "sensor": sensor,
   ])
   let request = WendyNotificationSendRequest(
-    audience: .user(id: "operator-1"),
+    audience: try WendyAudience(
+      userIDs: ["operator-2", "operator-1"],
+      teamIDs: [7],
+      roles: [.admin]
+    ),
     title: "Leak detected",
     body: "Pressure fell below the configured threshold.",
     severity: .warning,
@@ -77,7 +134,9 @@ func `send request maps content and nested JSON metadata`() throws {
 
   let proto = try Wendy_System_V1_SendRequest(request)
 
-  #expect(proto.audience.userID == "operator-1")
+  #expect(proto.audience.userIds == ["operator-1", "operator-2"])
+  #expect(proto.audience.teamIds == [7])
+  #expect(proto.audience.roles == [.admin])
   #expect(proto.title == "Leak detected")
   #expect(proto.body == "Pressure fell below the configured threshold.")
   #expect(proto.severity == .warning)
@@ -93,7 +152,7 @@ func `send request maps content and nested JSON metadata`() throws {
 @Test
 func `absent metadata remains absent in the wire request`() throws {
   let request = WendyNotificationSendRequest(
-    audience: .organizationTeam(id: 3),
+    audience: try WendyAudience(teamIDs: [3]),
     title: "Inspection due",
     body: "Inspect line 2.",
     severity: .info,
@@ -132,9 +191,9 @@ func `non-finite metadata numbers are rejected before transport`() {
 }
 
 @Test
-func `unspecified severity is retained for Client models but rejected when sending`() {
+func `unspecified severity is retained for Client models but rejected when sending`() throws {
   let request = WendyNotificationSendRequest(
-    audience: .user(id: "user-1"),
+    audience: try WendyAudience(userIDs: ["user-1"]),
     title: "Missing severity",
     body: "This request should not be sent.",
     severity: .unspecified,
@@ -181,7 +240,7 @@ func `static send delegates without exposing a service API`() async throws {
   let expected = WendyNotificationSendResponse(isDuplicate: false, recipientCount: 2)
   let sender = StubNotificationSender(response: expected)
   let request = WendyNotificationSendRequest(
-    audience: .organizationRole(.owner),
+    audience: try WendyAudience(roles: [.owner]),
     title: "Device offline",
     body: "The device stopped reporting.",
     severity: .critical,
@@ -197,7 +256,7 @@ func `static send delegates without exposing a service API`() async throws {
 @Suite(.serialized)
 struct WendySystemEnvironmentTests {
   @Test
-  func `static send clearly reports a missing System API runtime`() async {
+  func `static send clearly reports a missing System API runtime`() async throws {
     let oldValue = ProcessInfo.processInfo.environment[
       WendySystemNotificationTransport.environmentVariable]
     unsetenv(WendySystemNotificationTransport.environmentVariable)
@@ -208,7 +267,7 @@ struct WendySystemEnvironmentTests {
     }
 
     let request = WendyNotificationSendRequest(
-      audience: .user(id: "user-1"),
+      audience: try WendyAudience(userIDs: ["user-1"]),
       title: "Test",
       body: "Test",
       severity: .info,

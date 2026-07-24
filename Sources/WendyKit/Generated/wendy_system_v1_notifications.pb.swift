@@ -121,40 +121,15 @@ nonisolated struct Wendy_System_V1_NotificationAudience: Sendable {
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  var audience: Wendy_System_V1_NotificationAudience.OneOf_Audience? = nil
+  /// Selectors have union semantics. The agent normalizes and deduplicates them
+  /// and accepts at most 100 selectors total before forwarding to Cloud.
+  var userIds: [String] = []
 
-  var userID: String {
-    get {
-      if case .userID(let v)? = audience {return v}
-      return String()
-    }
-    set {audience = .userID(newValue)}
-  }
+  var teamIds: [Int32] = []
 
-  var orgTeamID: Int32 {
-    get {
-      if case .orgTeamID(let v)? = audience {return v}
-      return 0
-    }
-    set {audience = .orgTeamID(newValue)}
-  }
-
-  var organizationRole: Wendy_System_V1_OrganizationRole {
-    get {
-      if case .organizationRole(let v)? = audience {return v}
-      return .unspecified
-    }
-    set {audience = .organizationRole(newValue)}
-  }
+  var roles: [Wendy_System_V1_OrganizationRole] = []
 
   var unknownFields = SwiftProtobuf.UnknownStorage()
-
-  nonisolated enum OneOf_Audience: Equatable, Sendable {
-    case userID(String)
-    case orgTeamID(Int32)
-    case organizationRole(Wendy_System_V1_OrganizationRole)
-
-  }
 
   init() {}
 }
@@ -208,6 +183,7 @@ nonisolated struct Wendy_System_V1_SendResponse: Sendable {
 
   var duplicate: Bool = false
 
+  /// Number of resolved recipients, capped at 10,000 by Cloud.
   var recipientCount: Int32 = 0
 
   var unknownFields = SwiftProtobuf.UnknownStorage()
@@ -229,7 +205,7 @@ nonisolated extension Wendy_System_V1_OrganizationRole: SwiftProtobuf._ProtoName
 
 nonisolated extension Wendy_System_V1_NotificationAudience: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   static let protoMessageName: String = _protobuf_package + ".NotificationAudience"
-  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}user_id\0\u{3}org_team_id\0\u{3}organization_role\0")
+  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}user_ids\0\u{3}team_ids\0\u{1}roles\0")
 
   mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -237,60 +213,31 @@ nonisolated extension Wendy_System_V1_NotificationAudience: SwiftProtobuf.Messag
       // allocates stack space for every case branch when no optimizations are
       // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
-      case 1: try {
-        var v: String?
-        try decoder.decodeSingularStringField(value: &v)
-        if let v = v {
-          if self.audience != nil {try decoder.handleConflictingOneOf()}
-          self.audience = .userID(v)
-        }
-      }()
-      case 2: try {
-        var v: Int32?
-        try decoder.decodeSingularInt32Field(value: &v)
-        if let v = v {
-          if self.audience != nil {try decoder.handleConflictingOneOf()}
-          self.audience = .orgTeamID(v)
-        }
-      }()
-      case 3: try {
-        var v: Wendy_System_V1_OrganizationRole?
-        try decoder.decodeSingularEnumField(value: &v)
-        if let v = v {
-          if self.audience != nil {try decoder.handleConflictingOneOf()}
-          self.audience = .organizationRole(v)
-        }
-      }()
+      case 1: try { try decoder.decodeRepeatedStringField(value: &self.userIds) }()
+      case 2: try { try decoder.decodeRepeatedInt32Field(value: &self.teamIds) }()
+      case 3: try { try decoder.decodeRepeatedEnumField(value: &self.roles) }()
       default: break
       }
     }
   }
 
   func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    // The use of inline closures is to circumvent an issue where the compiler
-    // allocates stack space for every if/case branch local when no optimizations
-    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
-    // https://github.com/apple/swift-protobuf/issues/1182
-    switch self.audience {
-    case .userID?: try {
-      guard case .userID(let v)? = self.audience else { preconditionFailure() }
-      try visitor.visitSingularStringField(value: v, fieldNumber: 1)
-    }()
-    case .orgTeamID?: try {
-      guard case .orgTeamID(let v)? = self.audience else { preconditionFailure() }
-      try visitor.visitSingularInt32Field(value: v, fieldNumber: 2)
-    }()
-    case .organizationRole?: try {
-      guard case .organizationRole(let v)? = self.audience else { preconditionFailure() }
-      try visitor.visitSingularEnumField(value: v, fieldNumber: 3)
-    }()
-    case nil: break
+    if !self.userIds.isEmpty {
+      try visitor.visitRepeatedStringField(value: self.userIds, fieldNumber: 1)
+    }
+    if !self.teamIds.isEmpty {
+      try visitor.visitPackedInt32Field(value: self.teamIds, fieldNumber: 2)
+    }
+    if !self.roles.isEmpty {
+      try visitor.visitPackedEnumField(value: self.roles, fieldNumber: 3)
     }
     try unknownFields.traverse(visitor: &visitor)
   }
 
   static func ==(lhs: Wendy_System_V1_NotificationAudience, rhs: Wendy_System_V1_NotificationAudience) -> Bool {
-    if lhs.audience != rhs.audience {return false}
+    if lhs.userIds != rhs.userIds {return false}
+    if lhs.teamIds != rhs.teamIds {return false}
+    if lhs.roles != rhs.roles {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }

@@ -31,11 +31,11 @@ enum OrganizationRole {
 }
 
 message NotificationAudience {
-  oneof audience {
-    string user_id = 1;
-    int32 org_team_id = 2;
-    OrganizationRole organization_role = 3;
-  }
+  // Selectors have union semantics. The agent normalizes and deduplicates them
+  // and accepts at most 100 selectors total before forwarding to Cloud.
+  repeated string user_ids = 1;
+  repeated int32 team_ids = 2;
+  repeated OrganizationRole roles = 3;
 }
 
 message SendRequest {
@@ -51,5 +51,6 @@ message SendRequest {
 
 message SendResponse {
   bool duplicate = 1;
+  // Number of resolved recipients, capped at 10,000 by Cloud.
   int32 recipient_count = 2;
 }
