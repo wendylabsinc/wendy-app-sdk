@@ -57,11 +57,14 @@ struct WendySystemNotificationTransport: WendyNotificationSending {
       return try await withGRPCClient(transport: transport) { client in
         let notifications = Wendy_System_V1_NotificationService.Client(wrapping: client)
         return try await notifications.send(message) { response in
-          WendyNotificationSendResponse(try response.message)
+          let message = try response.message
+          return try WendyNotificationSendResponse(message)
         }
       }
     } catch let error as RPCError {
       throw WendyError(error)
+    } catch let error as WendyError {
+      throw error
     } catch {
       throw WendyError.unavailable
     }
@@ -76,7 +79,7 @@ extension Wendy_System_V1_SendRequest {
     self.body = request.body
     self.severity = try Wendy_System_V1_NotificationSeverity(request.severity)
     self.deepLink = request.deepLink
-    self.sourceID = request.sourceID
+    self.notificationID = request.notificationID.uuidString.lowercased()
     if let metadata = request.metadata {
       self.metadata = try Google_Protobuf_Struct(metadata.jsonObject())
     }
@@ -166,9 +169,12 @@ extension Google_Protobuf_Value {
 }
 
 extension WendyNotificationSendResponse {
-  init(_ response: Wendy_System_V1_SendResponse) {
+  init(_ response: Wendy_System_V1_SendResponse) throws {
+    guard let notificationID = UUID(uuidString: response.notificationID) else {
+      throw WendyError.protocolError("notification_id must be a UUID")
+    }
     self.init(
-      isDuplicate: response.duplicate,
+      notificationID: notificationID,
       recipientCount: Int(response.recipientCount)
     )
   }

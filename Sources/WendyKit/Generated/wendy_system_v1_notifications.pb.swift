@@ -156,8 +156,8 @@ nonisolated struct Wendy_System_V1_SendRequest: Sendable {
 
   var deepLink: String = String()
 
-  /// App-generated idempotency key within this source app and device.
-  var sourceID: String = String()
+  /// Canonical caller-generated Notification UUID. Retried requests reuse it.
+  var notificationID: String = String()
 
   var metadata: SwiftProtobuf.Google_Protobuf_Struct {
     get {_metadata ?? SwiftProtobuf.Google_Protobuf_Struct()}
@@ -181,7 +181,8 @@ nonisolated struct Wendy_System_V1_SendResponse: Sendable {
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  var duplicate: Bool = false
+  /// Canonical Notification UUID accepted for this request.
+  var notificationID: String = String()
 
   /// Number of resolved recipients, capped at 10,000 by Cloud.
   var recipientCount: Int32 = 0
@@ -245,7 +246,7 @@ nonisolated extension Wendy_System_V1_NotificationAudience: SwiftProtobuf.Messag
 
 nonisolated extension Wendy_System_V1_SendRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   static let protoMessageName: String = _protobuf_package + ".SendRequest"
-  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}audience\0\u{1}title\0\u{1}body\0\u{1}severity\0\u{3}deep_link\0\u{3}source_id\0\u{1}metadata\0")
+  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}audience\0\u{1}title\0\u{1}body\0\u{1}severity\0\u{3}deep_link\0\u{3}notification_id\0\u{1}metadata\0")
 
   mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -258,7 +259,7 @@ nonisolated extension Wendy_System_V1_SendRequest: SwiftProtobuf.Message, SwiftP
       case 3: try { try decoder.decodeSingularStringField(value: &self.body) }()
       case 4: try { try decoder.decodeSingularEnumField(value: &self.severity) }()
       case 5: try { try decoder.decodeSingularStringField(value: &self.deepLink) }()
-      case 6: try { try decoder.decodeSingularStringField(value: &self.sourceID) }()
+      case 6: try { try decoder.decodeSingularStringField(value: &self.notificationID) }()
       case 7: try { try decoder.decodeSingularMessageField(value: &self._metadata) }()
       default: break
       }
@@ -285,8 +286,8 @@ nonisolated extension Wendy_System_V1_SendRequest: SwiftProtobuf.Message, SwiftP
     if !self.deepLink.isEmpty {
       try visitor.visitSingularStringField(value: self.deepLink, fieldNumber: 5)
     }
-    if !self.sourceID.isEmpty {
-      try visitor.visitSingularStringField(value: self.sourceID, fieldNumber: 6)
+    if !self.notificationID.isEmpty {
+      try visitor.visitSingularStringField(value: self.notificationID, fieldNumber: 6)
     }
     try { if let v = self._metadata {
       try visitor.visitSingularMessageField(value: v, fieldNumber: 7)
@@ -300,7 +301,7 @@ nonisolated extension Wendy_System_V1_SendRequest: SwiftProtobuf.Message, SwiftP
     if lhs.body != rhs.body {return false}
     if lhs.severity != rhs.severity {return false}
     if lhs.deepLink != rhs.deepLink {return false}
-    if lhs.sourceID != rhs.sourceID {return false}
+    if lhs.notificationID != rhs.notificationID {return false}
     if lhs._metadata != rhs._metadata {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
@@ -309,7 +310,7 @@ nonisolated extension Wendy_System_V1_SendRequest: SwiftProtobuf.Message, SwiftP
 
 nonisolated extension Wendy_System_V1_SendResponse: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   static let protoMessageName: String = _protobuf_package + ".SendResponse"
-  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}duplicate\0\u{3}recipient_count\0")
+  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}notification_id\0\u{3}recipient_count\0")
 
   mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -317,7 +318,7 @@ nonisolated extension Wendy_System_V1_SendResponse: SwiftProtobuf.Message, Swift
       // allocates stack space for every case branch when no optimizations are
       // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
-      case 1: try { try decoder.decodeSingularBoolField(value: &self.duplicate) }()
+      case 1: try { try decoder.decodeSingularStringField(value: &self.notificationID) }()
       case 2: try { try decoder.decodeSingularInt32Field(value: &self.recipientCount) }()
       default: break
       }
@@ -325,8 +326,8 @@ nonisolated extension Wendy_System_V1_SendResponse: SwiftProtobuf.Message, Swift
   }
 
   func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    if self.duplicate != false {
-      try visitor.visitSingularBoolField(value: self.duplicate, fieldNumber: 1)
+    if !self.notificationID.isEmpty {
+      try visitor.visitSingularStringField(value: self.notificationID, fieldNumber: 1)
     }
     if self.recipientCount != 0 {
       try visitor.visitSingularInt32Field(value: self.recipientCount, fieldNumber: 2)
@@ -335,7 +336,7 @@ nonisolated extension Wendy_System_V1_SendResponse: SwiftProtobuf.Message, Swift
   }
 
   static func ==(lhs: Wendy_System_V1_SendResponse, rhs: Wendy_System_V1_SendResponse) -> Bool {
-    if lhs.duplicate != rhs.duplicate {return false}
+    if lhs.notificationID != rhs.notificationID {return false}
     if lhs.recipientCount != rhs.recipientCount {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true

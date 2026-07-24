@@ -1,3 +1,5 @@
+import Foundation
+
 /// The notification content and audience supplied by a Wendy app.
 public struct WendyNotificationSendRequest: Sendable, Hashable {
   /// The normalized user, team, and role selector union for this delivery.
@@ -6,7 +8,13 @@ public struct WendyNotificationSendRequest: Sendable, Hashable {
   public var body: String
   public var severity: WendyNotificationSeverity
   public var deepLink: String
-  public var sourceID: String
+
+  /// The canonical caller-generated Notification identifier.
+  ///
+  /// The default is generated once when this request is initialized. Retain and
+  /// resend the same request—or explicitly reuse this value—for retries.
+  public let notificationID: UUID
+
   public var metadata: WendyNotificationMetadata?
 
   public init(
@@ -15,7 +23,7 @@ public struct WendyNotificationSendRequest: Sendable, Hashable {
     body: String,
     severity: WendyNotificationSeverity,
     deepLink: String,
-    sourceID: String,
+    notificationID: UUID = UUID(),
     metadata: WendyNotificationMetadata? = nil
   ) {
     self.audience = audience
@@ -23,7 +31,7 @@ public struct WendyNotificationSendRequest: Sendable, Hashable {
     self.body = body
     self.severity = severity
     self.deepLink = deepLink
-    self.sourceID = sourceID
+    self.notificationID = notificationID
     self.metadata = metadata
   }
 }
