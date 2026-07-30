@@ -93,6 +93,7 @@ The complete upstream license is at `Sources/WendyTextKit/Resources/LICENSE-font
 ## 3. Swift package dependencies (linked into binaries)
 
 **MIT License** (§4):
+- IkigaJSON / swift-json (Joannis Orlandos) — 2.5.3
 - swift-cross-ui (stackotter) — 0.7.0
 - swift-image-formats (stackotter) — 0.5.0
 
@@ -126,9 +127,9 @@ support is built):
 ## 4. License texts
 
 ### MIT License
-(Applies to stb_truetype, the vendored DRM uAPI headers, swift-cross-ui,
-swift-image-formats, and other MIT-licensed components above. Copyright is held
-by the respective authors named above.)
+(Applies to stb_truetype, the vendored DRM uAPI headers, IkigaJSON,
+swift-cross-ui, swift-image-formats, and other MIT-licensed components above.
+Copyright is held by the respective authors named above.)
 
 ```
 Permission is hereby granted, free of charge, to any person obtaining a copy of

@@ -1,4 +1,4 @@
-// swift-tools-version: 6.0
+// swift-tools-version: 6.3.2
 import PackageDescription
 
 // Standalone package for the headless on-device probe. It depends ONLY on the
