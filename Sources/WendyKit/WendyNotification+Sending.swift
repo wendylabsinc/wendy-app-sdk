@@ -94,6 +94,7 @@ extension Wendy_System_V1_NotificationAudience {
     self.init()
     self.userIds = audience.userIDs
     self.teamIds = audience.teamIDs
+    self.teamUuids = audience.teamUUIDs
     self.roles = audience.roles.map(Wendy_System_V1_OrganizationRole.init)
   }
 }

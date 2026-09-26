@@ -125,9 +125,13 @@ nonisolated struct Wendy_System_V1_NotificationAudience: Sendable {
   /// and accepts at most 100 selectors total before forwarding to Cloud.
   var userIds: [String] = []
 
+  /// Legacy Cloud v1 numeric team IDs.
   var teamIds: [Int32] = []
 
   var roles: [Wendy_System_V1_OrganizationRole] = []
+
+  /// Canonical Cloud v2 team UUIDs. Do not set both team_ids and team_uuids.
+  var teamUuids: [String] = []
 
   var unknownFields = SwiftProtobuf.UnknownStorage()
 
@@ -203,7 +207,7 @@ nonisolated extension Wendy_System_V1_OrganizationRole: SwiftProtobuf._ProtoName
 
 nonisolated extension Wendy_System_V1_NotificationAudience: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   static let protoMessageName: String = _protobuf_package + ".NotificationAudience"
-  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}user_ids\0\u{3}team_ids\0\u{1}roles\0")
+  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}user_ids\0\u{3}team_ids\0\u{1}roles\0\u{3}team_uuids\0")
 
   mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -214,6 +218,7 @@ nonisolated extension Wendy_System_V1_NotificationAudience: SwiftProtobuf.Messag
       case 1: try { try decoder.decodeRepeatedStringField(value: &self.userIds) }()
       case 2: try { try decoder.decodeRepeatedInt32Field(value: &self.teamIds) }()
       case 3: try { try decoder.decodeRepeatedEnumField(value: &self.roles) }()
+      case 4: try { try decoder.decodeRepeatedStringField(value: &self.teamUuids) }()
       default: break
       }
     }
@@ -229,6 +234,9 @@ nonisolated extension Wendy_System_V1_NotificationAudience: SwiftProtobuf.Messag
     if !self.roles.isEmpty {
       try visitor.visitPackedEnumField(value: self.roles, fieldNumber: 3)
     }
+    if !self.teamUuids.isEmpty {
+      try visitor.visitRepeatedStringField(value: self.teamUuids, fieldNumber: 4)
+    }
     try unknownFields.traverse(visitor: &visitor)
   }
 
@@ -236,6 +244,7 @@ nonisolated extension Wendy_System_V1_NotificationAudience: SwiftProtobuf.Messag
     if lhs.userIds != rhs.userIds {return false}
     if lhs.teamIds != rhs.teamIds {return false}
     if lhs.roles != rhs.roles {return false}
+    if lhs.teamUuids != rhs.teamUuids {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }

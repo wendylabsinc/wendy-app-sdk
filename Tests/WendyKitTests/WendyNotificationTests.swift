@@ -53,6 +53,22 @@ func `audience normalizes and maps selector unions to the System API`() throws {
 }
 
 @Test
+func `audience normalizes and maps Cloud v2 team UUIDs`() throws {
+  let audience = try WendyAudience(teamUUIDs: [
+    " 223e4567-e89b-12d3-a456-426614174000 ",
+    "123e4567-e89b-12d3-a456-426614174000",
+    "123e4567-e89b-12d3-a456-426614174000",
+  ])
+
+  #expect(
+    audience.teamUUIDs == [
+      "123e4567-e89b-12d3-a456-426614174000",
+      "223e4567-e89b-12d3-a456-426614174000",
+    ])
+  #expect(Wendy_System_V1_NotificationAudience(audience).teamUuids == audience.teamUUIDs)
+}
+
+@Test
 func `audience requires valid selectors`() {
   #expect(throws: WendyError.invalidRequest("audience must contain at least one selector")) {
     _ = try WendyAudience()
@@ -79,6 +95,15 @@ func `audience requires valid selectors`() {
   #expect(throws: WendyError.invalidRequest("audience team IDs must be positive")) {
     _ = try WendyAudience(teamIDs: [0])
   }
+  #expect(throws: WendyError.invalidRequest("audience team UUIDs must contain canonical UUIDs")) {
+    _ = try WendyAudience(teamUUIDs: ["NOT-A-UUID"])
+  }
+  #expect(throws: WendyError.invalidRequest("audience cannot contain both team IDs and team UUIDs"))
+  {
+    _ = try WendyAudience(
+      teamIDs: [7],
+      teamUUIDs: ["123e4567-e89b-12d3-a456-426614174000"])
+  }
 }
 
 @Test
@@ -95,7 +120,9 @@ func `audience accepts at most one hundred unique selectors total`() throws {
   )
 
   #expect(WendyAudience.maximumSelectorCount == 100)
-  #expect(audience.userIDs.count + audience.teamIDs.count + audience.roles.count == 100)
+  #expect(
+    audience.userIDs.count + audience.teamIDs.count + audience.teamUUIDs.count
+      + audience.roles.count == 100)
   #expect(duplicateHeavy.userIDs == ["same-user"])
   #expect(
     throws: WendyError.invalidRequest("audience must contain at most 100 selectors")
